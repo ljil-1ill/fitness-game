@@ -55,7 +55,7 @@
         <circle class="progress-circle" cx="100" cy="100" r="90"/>
         <circle class="progress-fill" cx="100" cy="100" r="90" stroke-dasharray="565" stroke-dashoffset="565" transform="rotate(-90 100 100)"/>
       </svg>
-      <div class="progress-text"><span id="progress-text">0 남음</span></div>
+      <div class="progress-text"><span id="progress-text">0 reps 남음</span></div>
     </div>
     <p id="total-reps">총 누적: 0 reps</p>
   </header>
@@ -121,7 +121,7 @@
 
     let data = {
       exercises: defaultExercises.map(name => ({name})),
-      history: {}, // "2026-01-13": {"풀업": 50, "푸쉬업": 100, ...}
+      history: {},
       rewards: defaultRewards,
       levelReqs: defaultLevelReqs
     };
@@ -148,27 +148,25 @@
       const total = getTotalReps();
       let cumulative = 0;
       let currentLevel = 1;
-      let nextReq = data.levelReqs[0]?.requiredReps || 0;
-      let currentReqIndex = 0;
-      for (let i = 0; i < data.levelReqs.length; i++) {
-        const req = data.levelReqs[i];
+      let nextRepsNeeded = data.levelReqs[0]?.requiredReps || 0;
+      for (const req of data.levelReqs) {
         if (cumulative + req.requiredReps > total) {
-          nextReq = req.requiredReps - (total - cumulative);
-          currentReqIndex = i;
+          nextRepsNeeded = req.requiredReps - (total - cumulative);
           break;
         }
         cumulative += req.requiredReps;
         currentLevel = req.toLevel;
       }
-      const percent = data.levelReqs[currentReqIndex] ? ((data.levelReqs[currentReqIndex].requiredReps - nextReq) / data.levelReqs[currentReqIndex].requiredReps) * 100 : 100;
-      return { currentLevel, nextReps: nextReq, percent, cumulative };
+      const currentReq = data.levelReqs.find(r => r.toLevel === currentLevel + 1) || data.levelReqs[data.levelReqs.length - 1];
+      const percent = currentReq ? (currentReq.requiredReps - nextRepsNeeded) / currentReq.requiredReps * 100 : 100;
+      return { currentLevel, nextRepsNeeded, percent: Math.min(percent, 100) };
     }
 
     function updateHeader() {
       const prevLevel = document.getElementById("current-level").textContent;
       const info = getLevelInfo();
       document.getElementById("current-level").textContent = info.currentLevel;
-      document.getElementById("progress-text").textContent = info.nextReps > 0 ? `${info.nextReps} reps 남음` : "최고 레벨!";
+      document.getElementById("progress-text").textContent = info.nextRepsNeeded > 0 ? `${info.nextRepsNeeded} reps 남음` : "최고 레벨!";
       document.getElementById("total-reps").textContent = `총 누적: ${getTotalReps()} reps`;
 
       const circumference = 565;
@@ -188,17 +186,16 @@
       renderExercises(selectedDate);
     }
 
-    function renderExercises(date = null) {
-      const selectedDate = date || document.getElementById("record-date").value || new Date().toISOString().slice(0,10);
+    function renderExercises(selectedDate) {
       const list = document.getElementById("exercise-list");
       list.innerHTML = "";
       data.exercises.forEach((ex, i) => {
-        const savedReps = data.history[selectedDate] && data.history[selectedDate][ex.name] ? data.history[selectedDate][ex.name] : 0;
+        const saved = data.history[selectedDate]?.[ex.name] || 0;
         const div = document.createElement("div");
         div.className = "exercise-item";
         div.innerHTML = `
           <input type="text" value="${ex.name}" data-index="${i}" class="ex-name">
-          <input type="number" min="0" value="${savedReps}" data-index="${i}" class="ex-reps">
+          <input type="number" min="0" value="${saved}" data-index="${i}" class="ex-reps">
           <button class="danger remove-ex" data-index="${i}">삭제</button>
         `;
         list.appendChild(div);
@@ -232,7 +229,7 @@
         const name = data.exercises[i].name;
         const reps = Number(input.value) || 0;
         if (reps > 0) {
-          data.history[selectedDate][name] = reps; // 덮어쓰기 (기존 + 추가가 아닌 현재 값 전체 저장)
+          data.history[selectedDate][name] = reps;
           dailyTotal += reps;
         } else {
           delete data.history[selectedDate][name];
@@ -241,60 +238,49 @@
       saveData();
       updateChart();
       updateHeader();
-      alert(`${selectedDate} 기록이 저장되었습니다! (총 ${dailyTotal} reps)`);
+      alert(`${selectedDate} 기록 저장 완료! (총 ${dailyTotal} reps)`);
     }
 
     let chart;
     function updateChart() {
       const sortedDates = Object.keys(data.history).sort();
-      const datasets = [];
-      const colors = ["#4CAF50", "#2196F3", "#FF9800", "#F44336", "#9C27B0", "#00BCD4", "#FFEB3B", "#795548"];
-
-      // 총합
-      const totalData = sortedDates.map(date => {
-        let sum = 0;
-        for (const ex in data.history[date]) sum += data.history[date][ex];
-        let cumulative = sum;
-        for (let d of sortedDates.filter(d => d < date)) {
-          for (const ex in data.history[d]) cumulative += data.history[d][ex];
-        }
-        return cumulative;
-      });
-      datasets.push({
-        label: "총 누적",
-        data: totalData,
-        borderColor: "#FFFFFF",
-        backgroundColor: "rgba(255,255,255,0.2)",
-        tension: 0.3,
-        fill: true
-      });
-
-      // 종목별
-      data.exercises.forEach((ex, idx) => {
-        const color = colors[idx % colors.length];
-        const exData = sortedDates.map(date => {
-          let cumulative = data.history[date][ex.name] || 0;
-          for (let d of sortedDates.filter(d => d < date)) {
-            cumulative += data.history[d][ex.name] || 0;
-          }
-          return cumulative;
-        });
-        datasets.push({
+      const datasets = data.exercises.map((ex, idx) => {
+        const color = ["#4CAF50", "#2196F3", "#FF9800", "#F44336", "#9C27B0", "#00BCD4", "#FFEB3B", "#795548"][idx % 8];
+        return {
           label: ex.name,
-          data: exData,
-          borderColor: color,
-          backgroundColor: color + "33",
-          tension: 0.3
-        });
+          data: sortedDates.map(date => data.history[date][ex.name] || 0),
+          backgroundColor: color + "CC"
+        };
       });
 
       if (chart) chart.destroy();
       chart = new Chart(document.getElementById("historyChart"), {
-        type: "line",
+        type: "bar",
         data: { labels: sortedDates, datasets },
         options: {
-          scales: { x: { type: "time", time: { unit: "day" } } },
-          plugins: { legend: { position: "bottom" } }
+          plugins: {
+            tooltip: {
+              callbacks: {
+                afterLabel: context => {
+                  const date = sortedDates[context.dataIndex];
+                  let total = 0;
+                  let details = [];
+                  data.exercises.forEach(ex => {
+                    const reps = data.history[date]?.[ex.name] || 0;
+                    if (reps > 0) {
+                      total += reps;
+                      details.push(`${ex.name}: ${reps}`);
+                    }
+                  });
+                  return details.length ? [`총합: ${total}`, ...details] : "";
+                }
+              }
+            }
+          },
+          scales: {
+            x: { stacked: true },
+            y: { stacked: true, beginAtZero: true }
+          }
         }
       });
     }
@@ -347,15 +333,16 @@
     }
 
     function addLevelReq() {
-      const nextLevel = data.levelReqs.length > 0 ? Math.max(...data.levelReqs.map(r => r.toLevel)) + 1 : 2;
-      data.levelReqs.push({toLevel: nextLevel, requiredReps: 1000});
+      const next = data.levelReqs.length ? Math.max(...data.levelReqs.map(r => r.toLevel)) + 1 : 2;
+      data.levelReqs.push({toLevel: next, requiredReps: 1000});
       saveData();
       renderLevelReqsEdit();
       updateHeader();
     }
 
     function addReward() {
-      data.rewards.push({level: getLevelInfo().currentLevel + 1, name:"새 보상", desc:"설명", icon:"🏆"});
+      const nextLevel = getLevelInfo().currentLevel + 1;
+      data.rewards.push({level: nextLevel, name:"새 보상", desc:"설명", icon:"🏆"});
       saveData();
       renderRewardsEdit();
     }
@@ -380,6 +367,7 @@
           renderLevelReqsEdit();
           renderRewardsEdit();
         }
+        if (tab.dataset.tab === "chart") updateChart();
       });
     });
 
@@ -388,7 +376,6 @@
         const i = e.target.dataset.index;
         const oldName = data.exercises[i].name;
         data.exercises[i].name = e.target.value;
-        // 과거 기록 이름도 업데이트
         for (const date in data.history) {
           if (data.history[date][oldName] !== undefined) {
             data.history[date][e.target.value] = data.history[date][oldName];
@@ -401,9 +388,7 @@
     });
 
     document.getElementById("exercise-list").addEventListener("click", e => {
-      if (e.target.classList.contains("remove-ex")) {
-        removeExercise(e.target.dataset.index);
-      }
+      if (e.target.classList.contains("remove-ex")) removeExercise(e.target.dataset.index);
     });
 
     document.getElementById("level-reqs-edit").addEventListener("change", e => {
