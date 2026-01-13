@@ -34,8 +34,6 @@
     .reward-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1rem; }
     .reward { text-align: center; padding: 1rem; background: #333; border-radius: 8px; opacity: 0.4; transition: opacity 0.5s; }
     .reward.unlocked { opacity: 1; border: 2px solid var(--primary); }
-    .reward img { width: 80px; height: 80px; object-fit: contain; filter: grayscale(100%); }
-    .reward.unlocked img { filter: none; }
     .tabs { display: flex; gap: 1rem; margin-bottom: 1rem; }
     .tab { padding: 0.8rem 1.5rem; background: #333; border-radius: 8px 8px 0 0; cursor: pointer; }
     .tab.active { background: var(--primary); }
@@ -45,6 +43,9 @@
     .level-up.show { display: flex; }
     .level-up h2 { font-size: 4rem; color: var(--primary); animation: bounce 1s infinite; }
     @keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { padding: 0.5rem; border: 1px solid #444; }
+    input[type="date"] { background: #444; color: #eee; border: none; padding: 0.5rem; border-radius: 4px; }
   </style>
 </head>
 <body>
@@ -70,9 +71,10 @@
       </div>
 
       <div id="today" class="tab-content active">
+        <label>기록 날짜: <input type="date" id="record-date"/></label>
         <div id="exercise-list"></div>
         <button id="add-exercise-btn">+ 운동 추가</button>
-        <button id="save-today-btn" style="background:#2196F3">오늘 기록 저장</button>
+        <button id="save-today-btn" style="background:#2196F3">기록 저장</button>
       </div>
 
       <div id="chart" class="tab-content">
@@ -80,9 +82,10 @@
       </div>
 
       <div id="settings" class="tab-content">
-        <h3>레벨업 기준 설정</h3>
-        <label>레벨당 필요한 reps: <input type="number" id="reps-per-level" value="1000"/></label><br><br>
-        <button id="save-settings-btn">설정 저장</button>
+        <h3>레벨업 기준 (차등 적용)</h3>
+        <p>각 레벨로 올라가기 위해 필요한 추가 reps를 설정하세요.</p>
+        <div id="level-reqs-edit"></div>
+        <button id="add-level-req-btn">+ 레벨 기준 추가</button>
 
         <h3 style="margin-top:2rem">보상 관리</h3>
         <div id="rewards-edit"></div>
@@ -110,54 +113,70 @@
       {level: 15, name: "새 운동화 구매 권한", desc: "동기부여!", icon: "👟"},
       {level: 20, name: "전신 마사지 데이", desc: "회복의 날", icon: "💆"}
     ];
+    const defaultLevelReqs = [
+      {toLevel: 2, requiredReps: 1000},
+      {toLevel: 3, requiredReps: 1500},
+      {toLevel: 4, requiredReps: 2000},
+      {toLevel: 5, requiredReps: 3000},
+      {toLevel: 6, requiredReps: 4000}
+    ];
 
     let data = {
-      exercises: defaultExercises.map(name => ({name, today: 0})),
-      history: {},
+      exercises: defaultExercises.map(name => ({name})),
+      history: {}, // "2026-01-13": {"풀업": 10, "푸쉬업": 20, ...}
       rewards: defaultRewards,
-      settings: { repsPerLevel: 1000 }
+      levelReqs: defaultLevelReqs
     };
 
     if (localStorage.getItem("fitnessGameData")) {
       data = JSON.parse(localStorage.getItem("fitnessGameData"));
     }
 
-    const today = new Date().toISOString().slice(0,10);
-
     function saveData() {
       localStorage.setItem("fitnessGameData", JSON.stringify(data));
     }
 
     function getTotalReps() {
-      return Object.values(data.history).reduce((a,b)=>a+b,0);
+      let total = 0;
+      for (const date in data.history) {
+        for (const ex in data.history[date]) {
+          total += data.history[date][ex];
+        }
+      }
+      return total;
     }
 
-    function getCurrentLevel() {
-      return Math.floor(getTotalReps() / data.settings.repsPerLevel) + 1;
-    }
-
-    function getProgress() {
+    function getLevelInfo() {
       const total = getTotalReps();
-      const needed = data.settings.repsPerLevel;
-      const currentInLevel = total % needed;
-      return { current: currentInLevel, needed, percent: (currentInLevel / needed) * 100 };
+      let cumulative = 0;
+      let currentLevel = 1;
+      let nextReq = data.levelReqs.find(r => r.toLevel === 2)?.requiredReps || 0;
+      for (const req of data.levelReqs) {
+        if (cumulative + req.requiredReps > total) {
+          nextReq = req.requiredReps - (total - cumulative);
+          break;
+        }
+        cumulative += req.requiredReps;
+        currentLevel = req.toLevel;
+      }
+      const percent = nextReq > 0 ? ((req?.requiredReps || 0) - nextReq) / (req?.requiredReps || 0) * 100 : 100;
+      return { currentLevel, nextReps: nextReq, percent, cumulative };
     }
 
     function updateHeader() {
-      const level = getCurrentLevel();
       const prevLevel = document.getElementById("current-level").textContent;
-      document.getElementById("current-level").textContent = level;
-      const prog = getProgress();
-      document.getElementById("progress-text").textContent = `${prog.current} / ${prog.needed}`;
+      const info = getLevelInfo();
+      document.getElementById("current-level").textContent = info.currentLevel;
+      document.getElementById("progress-text").textContent = `${info.nextReps > 0 ? info.nextReps : 0} 남음`;
       document.getElementById("total-reps").textContent = `총 누적: ${getTotalReps()} reps`;
 
       const circumference = 565;
-      const offset = circumference - (prog.percent / 100 * circumference);
+      const offset = circumference - (info.percent / 100 * circumference);
       document.querySelector(".progress-fill").style.strokeDashoffset = offset;
 
-      if (level > prevLevel) {
+      if (info.currentLevel > prevLevel) {
         document.getElementById("level-up").classList.add("show");
-        setTimeout(()=>document.getElementById("level-up").classList.remove("show"), 4000);
+        setTimeout(() => document.getElementById("level-up").classList.remove("show"), 4000);
       }
 
       renderRewards();
@@ -166,64 +185,118 @@
     function renderExercises() {
       const list = document.getElementById("exercise-list");
       list.innerHTML = "";
-      data.exercises.forEach((ex,i) => {
+      data.exercises.forEach((ex, i) => {
         const div = document.createElement("div");
         div.className = "exercise-item";
         div.innerHTML = `
           <input type="text" value="${ex.name}" data-index="${i}" class="ex-name">
-          <input type="number" min="0" value="${ex.today||0}" data-index="${i}" class="ex-reps">
-          <button class="danger" data-index="${i}" class="remove-ex">삭제</button>
+          <input type="number" min="0" value="0" data-index="${i}" class="ex-reps">
+          <button class="danger remove-ex" data-index="${i}">삭제</button>
         `;
         list.appendChild(div);
       });
     }
 
     function addExercise() {
-      data.exercises.push({name: "새 운동", today: 0});
+      data.exercises.push({name: "새 운동"});
       saveData();
       renderExercises();
     }
 
     function removeExercise(i) {
-      data.exercises.splice(i,1);
+      const name = data.exercises[i].name;
+      data.exercises.splice(i, 1);
+      // 과거 기록에서도 삭제
+      for (const date in data.history) {
+        delete data.history[date][name];
+      }
       saveData();
       renderExercises();
+      updateChart();
+      updateHeader();
     }
 
     function saveToday() {
-      const dailyTotal = data.exercises.reduce((sum,ex)=>sum+(ex.today||0),0);
+      const selectedDate = document.getElementById("record-date").value || new Date().toISOString().slice(0,10);
+      if (!data.history[selectedDate]) data.history[selectedDate] = {};
+      let dailyTotal = 0;
+      document.querySelectorAll(".ex-reps").forEach(input => {
+        const i = input.dataset.index;
+        const name = data.exercises[i].name;
+        const reps = Number(input.value) || 0;
+        if (reps > 0) {
+          data.history[selectedDate][name] = (data.history[selectedDate][name] || 0) + reps;
+          dailyTotal += reps;
+          input.value = 0;
+        }
+      });
       if (dailyTotal > 0) {
-        data.history[today] = (data.history[today]||0) + dailyTotal;
-        data.exercises.forEach(ex => ex.today = 0);
         saveData();
-        renderExercises();
         updateChart();
         updateHeader();
-        alert("오늘 기록이 저장되었습니다!");
+        alert(`${selectedDate} 기록이 저장되었습니다! (+${dailyTotal} reps)`);
       }
     }
 
     let chart;
     function updateChart() {
-      const labels = Object.keys(data.history).sort();
-      const values = labels.map(date => {
+      const sortedDates = Object.keys(data.history).sort();
+      const datasets = [];
+      const colors = ["#4CAF50", "#2196F3", "#FF9800", "#F44336", "#9C27B0", "#00BCD4", "#FFEB3B", "#795548"];
+
+      // 총합 데이터셋
+      const totalData = sortedDates.map(date => {
         let sum = 0;
-        for (let d of Object.keys(data.history).sort().filter(x=>x<=date)) sum += data.history[d];
-        return sum;
+        for (const ex in data.history[date]) sum += data.history[date][ex];
+        let cumulative = sum;
+        for (let i = 0; i < sortedDates.indexOf(date); i++) {
+          for (const ex in data.history[sortedDates[i]]) cumulative += data.history[sortedDates[i]][ex];
+        }
+        return cumulative;
+      });
+      datasets.push({
+        label: "총 누적",
+        data: totalData,
+        borderColor: "#FFFFFF",
+        backgroundColor: "rgba(255,255,255,0.2)",
+        tension: 0.3,
+        fill: true
+      });
+
+      // 종목별 데이터셋
+      data.exercises.forEach((ex, idx) => {
+        const color = colors[idx % colors.length];
+        const exData = sortedDates.map(date => {
+          let cumulative = data.history[date][ex.name] || 0;
+          for (let i = 0; i < sortedDates.indexOf(date); i++) {
+            cumulative += data.history[sortedDates[i]][ex.name] || 0;
+          }
+          return cumulative;
+        });
+        datasets.push({
+          label: ex.name,
+          data: exData,
+          borderColor: color,
+          backgroundColor: color + "33",
+          tension: 0.3
+        });
       });
 
       if (chart) chart.destroy();
       chart = new Chart(document.getElementById("historyChart"), {
         type: "line",
-        data: { labels, datasets: [{ label: "누적 reps", data: values, borderColor: "#4CAF50", tension: 0.3, fill: true, backgroundColor: "rgba(76,175,80,0.2)" }] },
-        options: { scales: { x: { type: "time", time: { unit: "day" } } } }
+        data: { labels: sortedDates, datasets },
+        options: {
+          scales: { x: { type: "time", time: { unit: "day" } } },
+          plugins: { legend: { position: "bottom" } }
+        }
       });
     }
 
     function renderRewards() {
       const grid = document.getElementById("rewards-grid");
       grid.innerHTML = "";
-      const level = getCurrentLevel();
+      const level = getLevelInfo().currentLevel;
       data.rewards.forEach(r => {
         const div = document.createElement("div");
         div.className = "reward" + (level >= r.level ? " unlocked" : "");
@@ -236,10 +309,24 @@
       });
     }
 
+    function renderLevelReqsEdit() {
+      const container = document.getElementById("level-reqs-edit");
+      container.innerHTML = "<h4>레벨업 필요 reps 목록</h4>";
+      data.levelReqs.forEach((req, i) => {
+        const div = document.createElement("div");
+        div.style = "margin-bottom:1rem;padding:1rem;background:#333;border-radius:8px;";
+        div.innerHTML = `
+          레벨 ${req.toLevel} 도달 필요 reps <input type="number" value="${req.requiredReps}" data-index="${i}" class="level-req-reps">
+          <button class="danger remove-level-req" data-index="${i}">삭제</button>
+        `;
+        container.appendChild(div);
+      });
+    }
+
     function renderRewardsEdit() {
       const container = document.getElementById("rewards-edit");
       container.innerHTML = "<h4>보상 목록</h4>";
-      data.rewards.forEach((r,i) => {
+      data.rewards.forEach((r, i) => {
         const div = document.createElement("div");
         div.style = "margin-bottom:1rem;padding:1rem;background:#333;border-radius:8px;";
         div.innerHTML = `
@@ -247,59 +334,81 @@
           이름 <input type="text" value="${r.name}" data-index="${i}" class="reward-name">
           설명 <input type="text" value="${r.desc}" data-index="${i}" class="reward-desc">
           아이콘 <input type="text" value="${r.icon}" data-index="${i}" class="reward-icon">
-          <button class="danger" data-index="${i}" class="remove-reward">삭제</button>
+          <button class="danger remove-reward" data-index="${i}">삭제</button>
         `;
         container.appendChild(div);
       });
     }
 
+    function addLevelReq() {
+      const nextLevel = data.levelReqs.length > 0 ? Math.max(...data.levelReqs.map(r => r.toLevel)) + 1 : 2;
+      data.levelReqs.push({toLevel: nextLevel, requiredReps: 1000});
+      saveData();
+      renderLevelReqsEdit();
+      updateHeader();
+    }
+
     function addReward() {
-      data.rewards.push({level: getCurrentLevel()+1, name:"새 보상", desc:"설명", icon:"🏆"});
+      data.rewards.push({level: getLevelInfo().currentLevel + 1, name:"새 보상", desc:"설명", icon:"🏆"});
       saveData();
       renderRewardsEdit();
     }
 
-    function saveSettings() {
-      data.settings.repsPerLevel = Number(document.getElementById("reps-per-level").value) || 1000;
-      saveData();
-      updateHeader();
-    }
-
     // Event Listeners
+    document.getElementById("record-date").value = new Date().toISOString().slice(0,10);
+
     document.getElementById("add-exercise-btn").addEventListener("click", addExercise);
     document.getElementById("save-today-btn").addEventListener("click", saveToday);
+    document.getElementById("add-level-req-btn").addEventListener("click", addLevelReq);
     document.getElementById("add-reward-btn").addEventListener("click", addReward);
-    document.getElementById("save-settings-btn").addEventListener("click", saveSettings);
 
     document.querySelectorAll(".tab").forEach(tab => {
       tab.addEventListener("click", () => {
-        document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
-        document.querySelectorAll(".tab-content").forEach(c=>c.classList.remove("active"));
+        document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+        document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
         tab.classList.add("active");
         document.getElementById(tab.dataset.tab).classList.add("active");
-        if (tab.dataset.tab === "settings") renderRewardsEdit();
+        if (tab.dataset.tab === "settings") {
+          renderLevelReqsEdit();
+          renderRewardsEdit();
+        }
       });
     });
 
-    document.getElementById("exercise-list").addEventListener("change", (e) => {
+    document.getElementById("exercise-list").addEventListener("change", e => {
       if (e.target.classList.contains("ex-name")) {
         const i = e.target.dataset.index;
         data.exercises[i].name = e.target.value;
         saveData();
-      } else if (e.target.classList.contains("ex-reps")) {
-        const i = e.target.dataset.index;
-        data.exercises[i].today = Number(e.target.value) || 0;
+        updateChart();
       }
     });
 
-    document.getElementById("exercise-list").addEventListener("click", (e) => {
+    document.getElementById("exercise-list").addEventListener("click", e => {
       if (e.target.classList.contains("remove-ex")) {
-        const i = e.target.dataset.index;
-        removeExercise(i);
+        removeExercise(e.target.dataset.index);
       }
     });
 
-    document.getElementById("rewards-edit").addEventListener("change", (e) => {
+    document.getElementById("level-reqs-edit").addEventListener("change", e => {
+      if (e.target.classList.contains("level-req-reps")) {
+        const i = e.target.dataset.index;
+        data.levelReqs[i].requiredReps = Number(e.target.value) || 1000;
+        saveData();
+        updateHeader();
+      }
+    });
+
+    document.getElementById("level-reqs-edit").addEventListener("click", e => {
+      if (e.target.classList.contains("remove-level-req")) {
+        data.levelReqs.splice(e.target.dataset.index, 1);
+        saveData();
+        renderLevelReqsEdit();
+        updateHeader();
+      }
+    });
+
+    document.getElementById("rewards-edit").addEventListener("change", e => {
       const i = e.target.dataset.index;
       if (e.target.classList.contains("reward-level")) data.rewards[i].level = Number(e.target.value);
       if (e.target.classList.contains("reward-name")) data.rewards[i].name = e.target.value;
@@ -308,10 +417,9 @@
       saveData();
     });
 
-    document.getElementById("rewards-edit").addEventListener("click", (e) => {
+    document.getElementById("rewards-edit").addEventListener("click", e => {
       if (e.target.classList.contains("remove-reward")) {
-        const i = e.target.dataset.index;
-        data.rewards.splice(i,1);
+        data.rewards.splice(e.target.dataset.index, 1);
         saveData();
         renderRewardsEdit();
       }
