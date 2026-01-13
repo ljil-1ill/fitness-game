@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>운동 게임 대시보드</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/luxon"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon"></script>
+  <style>
+    :root {
+      --primary: #4CAF50;
+      --dark: #222;
+      --light: #f4f4f4;
+      --accent: #FF5722;
+    }
+    body { font-family: 'Segoe UI', sans-serif; background: #111; color: #eee; margin:0; padding:0; }
+    header { background: linear-gradient(135deg, var(--primary), #2e7d32); padding: 2rem; text-align: center; }
+    h1 { margin:0; font-size: 2.5rem; }
+    .level-display { font-size: 4rem; margin: 1rem 0; }
+    .progress-container { width: 200px; height: 200px; margin: 0 auto; position: relative; }
+    .progress-circle { fill: none; stroke: #333; stroke-width: 15; }
+    .progress-fill { fill: none; stroke: var(--primary); stroke-width: 15; stroke-linecap: round; transition: stroke-dashoffset 0.8s ease; }
+    .progress-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.8rem; }
+    main { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; display: grid; gap: 2rem; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+    .card { background: var(--dark); padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+    .exercises { grid-column: 1 / -1; }
+    .exercise-item { display: grid; grid-template-columns: 1fr auto auto auto; gap: 1rem; align-items: center; margin-bottom: 1rem; padding: 1rem; background: #333; border-radius: 8px; }
+    .exercise-item input[type="text"] { background: transparent; border: none; color: #eee; font-size: 1.2rem; }
+    .exercise-item input[type="number"] { width: 80px; padding: 0.5rem; background: #444; border: none; color: #eee; border-radius: 4px; }
+    button { background: var(--primary); border: none; color: white; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; }
+    button.danger { background: var(--accent); }
+    .rewards { grid-column: 1 / -1; }
+    .reward-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1rem; }
+    .reward { text-align: center; padding: 1rem; background: #333; border-radius: 8px; opacity: 0.4; transition: opacity 0.5s; }
+    .reward.unlocked { opacity: 1; border: 2px solid var(--primary); }
+    .reward img { width: 80px; height: 80px; object-fit: contain; filter: grayscale(100%); }
+    .reward.unlocked img { filter: none; }
+    .tabs { display: flex; gap: 1rem; margin-bottom: 1rem; }
+    .tab { padding: 0.8rem 1.5rem; background: #333; border-radius: 8px 8px 0 0; cursor: pointer; }
+    .tab.active { background: var(--primary); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .level-up { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: none; align-items: center; justify-content: center; flex-direction: column; z-index: 100; }
+    .level-up.show { display: flex; }
+    .level-up h2 { font-size: 4rem; color: var(--primary); animation: bounce 1s infinite; }
+    @keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>운동 게임 대시보드</h1>
+    <div class="level-display">레벨 <span id="current-level">1</span></div>
+    <div class="progress-container">
+      <svg viewBox="0 0 200 200">
+        <circle class="progress-circle" cx="100" cy="100" r="90"/>
+        <circle class="progress-fill" cx="100" cy="100" r="90" stroke-dasharray="565" stroke-dashoffset="565" transform="rotate(-90 100 100)"/>
+      </svg>
+      <div class="progress-text"><span id="progress-text">0 / 1000</span></div>
+    </div>
+    <p id="total-reps">총 누적: 0 reps</p>
+  </header>
+
+  <main>
+    <div class="card exercises">
+      <div class="tabs">
+        <div class="tab active" data-tab="today">오늘 기록</div>
+        <div class="tab" data-tab="chart">히스토리 차트</div>
+        <div class="tab" data-tab="settings">설정</div>
+      </div>
+
+      <!-- 오늘 기록 탭 -->
+      <div id="today" class="tab-content active">
+        <div id="exercise-list"></div>
+        <button onclick="addExercise()">+ 운동 추가</button>
+        <button onclick="saveToday()" style="margin-left:1rem;background:#2196F3">오늘 기록 저장</button>
+      </div>
+
+      <!-- 차트 탭 -->
+      <div id="chart" class="tab-content">
+        <canvas id="historyChart" height="300"></canvas>
+      </div>
+
+      <!-- 설정 탭 -->
+      <div id="settings" class="tab-content">
+        <h3>레벨업 기준 설정</h3>
+        <label>레벨당 필요한 reps: <input type="number" id="reps-per-level" value="1000"/></label><br><br>
+        <button onclick="saveSettings()">설정 저장</button>
+
+        <h3 style="margin-top:2rem">보상 관리</h3>
+        <div id="rewards-edit"></div>
+        <button onclick="addReward()">+ 보상 추가</button>
+      </div>
+    </div>
+
+    <div class="card rewards">
+      <h2>Unlock된 보상</h2>
+      <div class="reward-grid" id="rewards-grid"></div>
+    </div>
+  </main>
+
+  <div class="level-up" id="level-up">
+    <h2>레벨업!</h2>
+    <p>새로운 보상이 해금되었습니다!</p>
+  </div>
+
+  <script>
+    const defaultExercises = ["풀업", "푸쉬업", "앱슬라이드", "스쿼트", "카프레이즈"];
+    const defaultRewards = [
+      {level: 2, name: "휴식 데이 쿠폰", desc: "하루 쉬어도 OK!", icon: "🏖️"},
+      {level: 5, name: "좋아하는 음악 플레이리스트", desc: "운동 중 듣기", icon: "🎵"},
+      {level: 10, name: "단백질 쉐이크 한 잔", desc: "자기 보상", icon: "🥤"},
+      {level: 15, name: "새 운동화 구매 권한", desc: "동기부여!", icon: "👟"},
+      {level: 20, name: "전신 마사지 데이", desc: "회복의 날", icon: "💆"}
+    ];
+
+    let data = {
+      exercises: defaultExercises.map(name => ({name, today: 0})),
+      history: {}, // "2026-01-13": 450
+      rewards: defaultRewards,
+      settings: { repsPerLevel: 1000 }
+    };
+
+    // Load from localStorage
+    if (localStorage.getItem("fitnessGameData")) {
+      data = JSON.parse(localStorage.getItem("fitnessGameData"));
+    }
+
+    const today = new Date().toISOString().slice(0,10);
+
+    function saveData() {
+      localStorage.setItem("fitnessGameData", JSON.stringify(data));
+    }
+
+    function getTotalReps() {
+      return Object.values(data.history).reduce((a,b)=>a+b,0);
+    }
+
+    function getCurrentLevel() {
+      return Math.floor(getTotalReps() / data.settings.repsPerLevel) + 1;
+    }
+
+    function getProgress() {
+      const total = getTotalReps();
+      const needed = data.settings.repsPerLevel;
+      const currentInLevel = total % needed;
+      return { current: currentInLevel, needed, percent: (currentInLevel / needed) * 100 };
+    }
+
+    function updateHeader() {
+      const level = getCurrentLevel();
+      const prevLevel = document.getElementById("current-level").textContent;
+      document.getElementById("current-level").textContent = level;
+      const prog = getProgress();
+      document.getElementById("progress-text").textContent = `${prog.current} / ${prog.needed}`;
+      document.getElementById("total-reps").textContent = `총 누적: ${getTotalReps()} reps`;
+
+      const circumference = 565;
+      const offset = circumference - (prog.percent / 100 * circumference);
+      document.querySelector(".progress-fill").style.strokeDashoffset = offset;
+
+      if (level > prevLevel) {
+        document.getElementById("level-up").classList.add("show");
+        setTimeout(()=>document.getElementById("level-up").classList.remove("show"), 4000);
+      }
+
+      renderRewards();
+    }
+
+    function renderExercises() {
+      const list = document.getElementById("exercise-list");
+      list.innerHTML = "";
+      data.exercises.forEach((ex,i) => {
+        const div = document.createElement("div");
+        div.className = "exercise-item";
+        div.innerHTML = `
+          <input type="text" value="${ex.name}" onchange="data.exercises[${i}].name=this.value; saveData();">
+          <input type="number" min="0" value="${ex.today||0}" onchange="data.exercises[${i}].today=Number(this.value)||0;">
+          <button onclick="removeExercise(${i})" class="danger">삭제</button>
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    function addExercise() {
+      data.exercises.push({name: "새 운동", today: 0});
+      saveData();
+      renderExercises();
+    }
+
+    function removeExercise(i) {
+      data.exercises.splice(i,1);
+      saveData();
+      renderExercises();
+    }
+
+    function saveToday() {
+      const dailyTotal = data.exercises.reduce((sum,ex)=>sum+(ex.today||0),0);
+      if (dailyTotal > 0) {
+        data.history[today] = (data.history[today]||0) + dailyTotal;
+        data.exercises.forEach(ex => ex.today = 0);
+        saveData();
+        renderExercises();
+        updateChart();
+        updateHeader();
+        alert("오늘 기록이 저장되었습니다!");
+      }
+    }
+
+    // Chart
+    let chart;
+    function updateChart() {
+      const labels = Object.keys(data.history).sort();
+      const values = labels.map(date => {
+        let sum = 0;
+        for (let d of Object.keys(data.history).sort().filter(x=>x<=date)) sum += data.history[d];
+        return sum;
+      });
+
+      if (chart) chart.destroy();
+      chart = new Chart(document.getElementById("historyChart"), {
+        type: "line",
+        data: { labels, datasets: [{ label: "누적 reps", data: values, borderColor: var(--primary), tension: 0.3, fill: true, backgroundColor: "rgba(76,175,80,0.2)" }] },
+        options: { scales: { x: { type: "time", time: { unit: "day" } } } }
+      });
+    }
+
+    // Rewards
+    function renderRewards() {
+      const grid = document.getElementById("rewards-grid");
+      grid.innerHTML = "";
+      const level = getCurrentLevel();
+      data.rewards.forEach(r => {
+        const div = document.createElement("div");
+        div.className = "reward" + (level >= r.level ? " unlocked" : "");
+        div.innerHTML = `
+          <div style="font-size:4rem">${r.icon}</div>
+          <h3>${r.name}</h3>
+          <p>${r.desc} (레벨 ${r.level})</p>
+        `;
+        grid.appendChild(div);
+      });
+    }
+
+    function renderRewardsEdit() {
+      const container = document.getElementById("rewards-edit");
+      container.innerHTML = "<h4>보상 목록</h4>";
+      data.rewards.forEach((r,i) => {
+        const div = document.createElement("div");
+        div.style = "margin-bottom:1rem;padding:1rem;background:#333;border-radius:8px;";
+        div.innerHTML = `
+          레벨 <input type="number" value="${r.level}" onchange="data.rewards[${i}].level=Number(this.value)">
+          이름 <input type="text" value="${r.name}" onchange="data.rewards[${i}].name=this.value">
+          설명 <input type="text" value="${r.desc}" onchange="data.rewards[${i}].desc=this.value">
+          아이콘 <input type="text" value="${r.icon}" onchange="data.rewards[${i}].icon=this.value">
+          <button class="danger" onclick="data.rewards.splice(${i},1);saveData();renderRewardsEdit();">삭제</button>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function addReward() {
+      data.rewards.push({level: getCurrentLevel()+1, name:"새 보상", desc:"설명", icon:"🏆"});
+      saveData();
+      renderRewardsEdit();
+    }
+
+    function saveSettings() {
+      data.settings.repsPerLevel = Number(document.getElementById("reps-per-level").value) || 1000;
+      saveData();
+      updateHeader();
+    }
+
+    // Tabs
+    document.querySelectorAll(".tab").forEach(tab => {
+      tab.addEventListener("click", () => {
+        document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+        document.querySelectorAll(".tab-content").forEach(c=>c.classList.remove("active"));
+        tab.classList.add("active");
+        document.getElementById(tab.dataset.tab).classList.add("active");
+        if (tab.dataset.tab === "settings") renderRewardsEdit();
+      });
+    });
+
+    // Init
+    renderExercises();
+    updateHeader();
+    updateChart();
+    renderRewards();
+  </script>
+</body>
+</html>
