@@ -10,96 +10,102 @@
   <style>
     :root {
       --primary: #4CAF50;
-      --dark: #222;
-      --light: #f4f4f4;
+      --dark: #1a1a1a;
+      --darker: #111;
       --accent: #FF5722;
+      --text: #eee;
     }
-    body { font-family: 'Segoe UI', sans-serif; background: #111; color: #eee; margin:0; padding:0; }
-    header { background: linear-gradient(135deg, var(--primary), #2e7d32); padding: 2rem; text-align: center; }
-    h1 { margin:0; font-size: 2.5rem; }
-    .level-display { font-size: 4rem; margin: 1rem 0; }
-    .progress-container { width: 200px; height: 200px; margin: 0 auto; position: relative; }
-    .progress-circle { fill: none; stroke: #333; stroke-width: 15; }
-    .progress-fill { fill: none; stroke: var(--primary); stroke-width: 15; stroke-linecap: round; transition: stroke-dashoffset 0.8s ease; }
-    .progress-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.8rem; }
-    main { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; display: grid; gap: 2rem; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
-    .card { background: var(--dark); padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-    .exercises { grid-column: 1 / -1; }
-    .exercise-item { display: grid; grid-template-columns: 1fr auto auto auto; gap: 1rem; align-items: center; margin-bottom: 1rem; padding: 1rem; background: #333; border-radius: 8px; }
-    .exercise-item input[type="text"] { background: transparent; border: none; color: #eee; font-size: 1.2rem; }
-    .exercise-item input[type="number"] { width: 80px; padding: 0.5rem; background: #444; border: none; color: #eee; border-radius: 4px; }
-    button { background: var(--primary); border: none; color: white; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin: 0.5rem 0.5rem 0 0; }
-    button.danger { background: var(--accent); }
-    .rewards { grid-column: 1 / -1; }
-    .reward-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1rem; }
-    .reward { text-align: center; padding: 1rem; background: #333; border-radius: 8px; opacity: 0.4; transition: opacity 0.5s; }
-    .reward.unlocked { opacity: 1; border: 2px solid var(--primary); }
-    .tabs { display: flex; gap: 1rem; margin-bottom: 1rem; }
-    .tab { padding: 0.8rem 1.5rem; background: #333; border-radius: 8px 8px 0 0; cursor: pointer; }
+    body { font-family: 'Segoe UI', sans-serif; background: var(--darker); color: var(--text); margin:0; padding:0; min-height: 100vh; display: flex; flex-direction: column; }
+    header { background: linear-gradient(135deg, var(--primary), #2e7d32); padding: 2rem 1rem; text-align: center; }
+    h1 { margin:0; font-size: 2.2rem; }
+    .level-info { display: flex; flex-direction: column; align-items: center; margin: 1.5rem 0; }
+    .level-display { font-size: 3.5rem; margin: 0.5rem 0; font-weight: bold; }
+    .progress-container { width: 180px; height: 180px; margin: 0 auto; position: relative; }
+    .progress-circle { fill: none; stroke: #333; stroke-width: 14; }
+    .progress-fill { fill: none; stroke: var(--primary); stroke-width: 14; stroke-linecap: round; transition: stroke-dashoffset 0.8s ease; }
+    .progress-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.6rem; font-weight: bold; }
+    .total-reps { font-size: 1.2rem; margin-top: 0.5rem; }
+    main { flex: 1; max-width: 1000px; margin: 0 auto; padding: 1rem; width: 100%; box-sizing: border-box; }
+    .tabs { display: flex; justify-content: center; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .tab { padding: 0.8rem 1.8rem; background: #333; border-radius: 8px 8px 0 0; cursor: pointer; transition: background 0.3s; }
     .tab.active { background: var(--primary); }
-    .tab-content { display: none; }
+    .tab-content { display: none; background: var(--dark); padding: 1.5rem; border-radius: 0 8px 8px 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.6); }
     .tab-content.active { display: block; }
-    .level-up { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: none; align-items: center; justify-content: center; flex-direction: column; z-index: 100; }
-    .level-up.show { display: flex; }
-    .level-up h2 { font-size: 4rem; color: var(--primary); animation: bounce 1s infinite; }
-    @keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
-    input[type="date"] { background: #444; color: #eee; border: none; padding: 0.5rem; border-radius: 4px; }
+    #today { display: flex; flex-direction: column; }
+    #record-date { width: 100%; max-width: 300px; margin: 0 auto 1.5rem; font-size: 1.2rem; }
+    #exercise-list { flex: 1; margin-bottom: 1rem; }
+    .exercise-item { display: grid; grid-template-columns: 2fr 1fr 60px; gap: 1rem; align-items: center; padding: 1rem; background: #2a2a2a; border-radius: 8px; margin-bottom: 1rem; }
+    .exercise-item input[type="text"] { background: transparent; border: none; color: var(--text); font-size: 1.2rem; }
+    .exercise-item input[type="number"] { background: #444; border: none; color: var(--text); padding: 0.6rem; border-radius: 4px; text-align: center; }
+    button { background: var(--primary); border: none; color: white; padding: 0.8rem 1.2rem; border-radius: 6px; cursor: pointer; transition: 0.3s; font-size: 1rem; }
+    button:hover { background: #66bb6a; }
+    button.danger { background: var(--accent); }
+    button.danger:hover { background: #f44336; }
+    .fixed-bottom { position: sticky; bottom: 1rem; display: flex; gap: 1rem; justify-content: center; margin-top: auto; }
+    .rewards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1.5rem; margin-top: 2rem; }
+    .reward { text-align: center; padding: 1.5rem; background: #2a2a2a; border-radius: 12px; transition: all 0.4s; opacity: 0.5; }
+    .reward.unlocked { opacity: 1; border: 3px solid var(--primary); transform: scale(1.05); box-shadow: 0 0 20px rgba(76,175,80,0.5); }
+    .reward-icon { font-size: 4rem; margin-bottom: 0.5rem; }
+    .level-up { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); display: none; align-items: center; justify-content: center; flex-direction: column; z-index: 100; }
+    .level-up.show { display: flex; animation: fadeIn 0.5s; }
+    .level-up h2 { font-size: 5rem; color: var(--primary); animation: bounce 1s infinite; }
+    @keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-30px); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    canvas { max-width: 100%; height: auto !important; }
   </style>
 </head>
 <body>
   <header>
     <h1>운동 게임 대시보드</h1>
-    <div class="level-display">레벨 <span id="current-level">1</span></div>
-    <div class="progress-container">
-      <svg viewBox="0 0 200 200">
-        <circle class="progress-circle" cx="100" cy="100" r="90"/>
-        <circle class="progress-fill" cx="100" cy="100" r="90" stroke-dasharray="565" stroke-dashoffset="565" transform="rotate(-90 100 100)"/>
-      </svg>
-      <div class="progress-text"><span id="progress-text">0 reps 남음</span></div>
+    <div class="level-info">
+      <div class="level-display">레벨 <span id="current-level">1</span></div>
+      <div class="progress-container">
+        <svg viewBox="0 0 200 200">
+          <circle class="progress-circle" cx="100" cy="100" r="90"/>
+          <circle class="progress-fill" cx="100" cy="100" r="90" stroke-dasharray="565" stroke-dashoffset="565" transform="rotate(-90 100 100)"/>
+        </svg>
+        <div class="progress-text"><span id="progress-text">0 reps 남음</span></div>
+      </div>
+      <div class="total-reps" id="total-reps">총 누적: 0 reps</div>
     </div>
-    <p id="total-reps">총 누적: 0 reps</p>
   </header>
 
   <main>
-    <div class="card exercises">
-      <div class="tabs">
-        <div class="tab active" data-tab="today">기록 입력</div>
-        <div class="tab" data-tab="chart">히스토리 차트</div>
-        <div class="tab" data-tab="settings">설정</div>
-      </div>
+    <div class="tabs">
+      <div class="tab active" data-tab="today">기록 입력</div>
+      <div class="tab" data-tab="chart">히스토리 차트</div>
+      <div class="tab" data-tab="settings">설정</div>
+    </div>
 
-      <div id="today" class="tab-content active">
-        <label>기록 날짜: <input type="date" id="record-date"/></label>
-        <div id="exercise-list"></div>
+    <div id="today" class="tab-content active">
+      <input type="date" id="record-date"/>
+      <div id="exercise-list"></div>
+      <div class="fixed-bottom">
         <button id="add-exercise-btn">+ 운동 추가</button>
-        <button id="save-today-btn" style="background:#2196F3">기록 저장</button>
-      </div>
-
-      <div id="chart" class="tab-content">
-        <canvas id="historyChart" height="300"></canvas>
-      </div>
-
-      <div id="settings" class="tab-content">
-        <h3>레벨업 기준 (차등 적용)</h3>
-        <p>각 레벨로 올라가기 위해 필요한 추가 reps</p>
-        <div id="level-reqs-edit"></div>
-        <button id="add-level-req-btn">+ 레벨 기준 추가</button>
-
-        <h3 style="margin-top:2rem">보상 관리</h3>
-        <div id="rewards-edit"></div>
-        <button id="add-reward-btn">+ 보상 추가</button>
+        <button id="save-today-btn">기록 저장</button>
       </div>
     </div>
 
-    <div class="card rewards">
-      <h2>Unlock된 보상</h2>
-      <div class="reward-grid" id="rewards-grid"></div>
+    <div id="chart" class="tab-content">
+      <canvas id="historyChart"></canvas>
     </div>
+
+    <div id="settings" class="tab-content">
+      <h3>레벨업 기준 (Quadratic 자동 적용 가능)</h3>
+      <button id="auto-quadratic-btn" style="background:#2196F3;margin-bottom:1rem;">Quadratic으로 재설정 (base 200)</button>
+      <div id="level-reqs-edit"></div>
+
+      <h3 style="margin-top:2rem">보상 관리</h3>
+      <div id="rewards-edit"></div>
+      <button id="add-reward-btn" style="margin-top:1rem;">+ 보상 추가</button>
+    </div>
+
+    <div class="rewards-grid" id="rewards-grid"></div>
   </main>
 
   <div class="level-up" id="level-up">
     <h2>레벨업!</h2>
-    <p>새로운 보상이 해금되었습니다!</p>
+    <p>축하합니다! 새로운 보상이 해금되었습니다!</p>
   </div>
 
   <script>
@@ -111,23 +117,30 @@
       {level: 15, name: "새 운동화 구매 권한", desc: "동기부여!", icon: "👟"},
       {level: 20, name: "전신 마사지 데이", desc: "회복의 날", icon: "💆"}
     ];
-    const defaultLevelReqs = [
-      {toLevel: 2, requiredReps: 1000},
-      {toLevel: 3, requiredReps: 1500},
-      {toLevel: 4, requiredReps: 2000},
-      {toLevel: 5, requiredReps: 3000},
-      {toLevel: 6, requiredReps: 4000}
-    ];
 
     let data = {
       exercises: defaultExercises.map(name => ({name})),
       history: {},
       rewards: defaultRewards,
-      levelReqs: defaultLevelReqs
+      levelReqs: [] // Quadratic으로 자동 생성
     };
+
+    // Quadratic 기본값 생성 함수
+    function generateQuadratic(base = 200, maxLevel = 20) {
+      const reqs = [];
+      for (let n = 1; n < maxLevel; n++) {
+        reqs.push({toLevel: n + 1, requiredReps: base * n * n});
+      }
+      return reqs;
+    }
 
     if (localStorage.getItem("fitnessGameData")) {
       data = JSON.parse(localStorage.getItem("fitnessGameData"));
+    }
+    // 첫 실행 시 Quadratic 기본 적용
+    if (data.levelReqs.length === 0) {
+      data.levelReqs = generateQuadratic();
+      saveData();
     }
 
     function saveData() {
@@ -137,9 +150,7 @@
     function getTotalReps() {
       let total = 0;
       for (const date in data.history) {
-        for (const ex in data.history[date]) {
-          total += data.history[date][ex];
-        }
+        for (const ex in data.history[date]) total += data.history[date][ex];
       }
       return total;
     }
@@ -157,13 +168,13 @@
         cumulative += req.requiredReps;
         currentLevel = req.toLevel;
       }
-      const currentReq = data.levelReqs.find(r => r.toLevel === currentLevel + 1) || data.levelReqs[data.levelReqs.length - 1];
+      const currentReq = data.levelReqs.find(r => r.toLevel === currentLevel + 1);
       const percent = currentReq ? (currentReq.requiredReps - nextRepsNeeded) / currentReq.requiredReps * 100 : 100;
       return { currentLevel, nextRepsNeeded, percent: Math.min(percent, 100) };
     }
 
     function updateHeader() {
-      const prevLevel = document.getElementById("current-level").textContent;
+      const prev = document.getElementById("current-level").textContent;
       const info = getLevelInfo();
       document.getElementById("current-level").textContent = info.currentLevel;
       document.getElementById("progress-text").textContent = info.nextRepsNeeded > 0 ? `${info.nextRepsNeeded} reps 남음` : "최고 레벨!";
@@ -173,24 +184,23 @@
       const offset = circumference - (info.percent / 100 * circumference);
       document.querySelector(".progress-fill").style.strokeDashoffset = offset;
 
-      if (info.currentLevel > prevLevel) {
+      if (info.currentLevel > prev) {
         document.getElementById("level-up").classList.add("show");
         setTimeout(() => document.getElementById("level-up").classList.remove("show"), 4000);
       }
-
       renderRewards();
     }
 
     function loadTodayRecords() {
-      const selectedDate = document.getElementById("record-date").value || new Date().toISOString().slice(0,10);
-      renderExercises(selectedDate);
+      const date = document.getElementById("record-date").value || new Date().toISOString().slice(0,10);
+      renderExercises(date);
     }
 
-    function renderExercises(selectedDate) {
+    function renderExercises(date) {
       const list = document.getElementById("exercise-list");
       list.innerHTML = "";
       data.exercises.forEach((ex, i) => {
-        const saved = data.history[selectedDate]?.[ex.name] || 0;
+        const saved = data.history[date]?.[ex.name] || 0;
         const div = document.createElement("div");
         div.className = "exercise-item";
         div.innerHTML = `
@@ -211,9 +221,7 @@
     function removeExercise(i) {
       const name = data.exercises[i].name;
       data.exercises.splice(i, 1);
-      for (const date in data.history) {
-        delete data.history[date][name];
-      }
+      for (const date in data.history) delete data.history[date][name];
       saveData();
       loadTodayRecords();
       updateChart();
@@ -221,66 +229,51 @@
     }
 
     function saveToday() {
-      const selectedDate = document.getElementById("record-date").value || new Date().toISOString().slice(0,10);
-      if (!data.history[selectedDate]) data.history[selectedDate] = {};
-      let dailyTotal = 0;
-      document.querySelectorAll(".ex-reps").forEach(input => {
-        const i = input.dataset.index;
+      const date = document.getElementById("record-date").value || new Date().toISOString().slice(0,10);
+      if (!data.history[date]) data.history[date] = {};
+      let daily = 0;
+      document.querySelectorAll(".ex-reps").forEach(inp => {
+        const i = inp.dataset.index;
         const name = data.exercises[i].name;
-        const reps = Number(input.value) || 0;
+        const reps = Number(inp.value) || 0;
         if (reps > 0) {
-          data.history[selectedDate][name] = reps;
-          dailyTotal += reps;
+          data.history[date][name] = reps;
+          daily += reps;
         } else {
-          delete data.history[selectedDate][name];
+          delete data.history[date][name];
         }
       });
       saveData();
       updateChart();
       updateHeader();
-      alert(`${selectedDate} 기록 저장 완료! (총 ${dailyTotal} reps)`);
+      alert(`${date} 기록 저장! (+${daily} reps)`);
     }
 
     let chart;
     function updateChart() {
-      const sortedDates = Object.keys(data.history).sort();
-      const datasets = data.exercises.map((ex, idx) => {
-        const color = ["#4CAF50", "#2196F3", "#FF9800", "#F44336", "#9C27B0", "#00BCD4", "#FFEB3B", "#795548"][idx % 8];
-        return {
-          label: ex.name,
-          data: sortedDates.map(date => data.history[date][ex.name] || 0),
-          backgroundColor: color + "CC"
-        };
-      });
+      const dates = Object.keys(data.history).sort();
+      const datasets = data.exercises.map((ex, i) => ({
+        label: ex.name,
+        data: dates.map(d => data.history[d][ex.name] || 0),
+        backgroundColor: ["#4CAF50","#2196F3","#FF9800","#F44336","#9C27B0","#00BCD4","#FFEB3B","#795548"][i % 8] + "CC"
+      }));
 
       if (chart) chart.destroy();
       chart = new Chart(document.getElementById("historyChart"), {
         type: "bar",
-        data: { labels: sortedDates, datasets },
+        data: { labels: dates, datasets },
         options: {
-          plugins: {
-            tooltip: {
-              callbacks: {
-                afterLabel: context => {
-                  const date = sortedDates[context.dataIndex];
-                  let total = 0;
-                  let details = [];
-                  data.exercises.forEach(ex => {
-                    const reps = data.history[date]?.[ex.name] || 0;
-                    if (reps > 0) {
-                      total += reps;
-                      details.push(`${ex.name}: ${reps}`);
-                    }
-                  });
-                  return details.length ? [`총합: ${total}`, ...details] : "";
-                }
-              }
-            }
-          },
-          scales: {
-            x: { stacked: true },
-            y: { stacked: true, beginAtZero: true }
-          }
+          plugins: { tooltip: { callbacks: { afterLabel: ctx => {
+            const date = dates[ctx.dataIndex];
+            let total = 0;
+            const details = data.exercises.map(ex => {
+              const r = data.history[date][ex.name] || 0;
+              total += r;
+              return r ? `${ex.name}: ${r}` : null;
+            }).filter(Boolean);
+            return details.length ? [`총합: ${total}`, ...details] : "";
+          }}}},
+          scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true }}
         }
       });
     }
@@ -292,11 +285,7 @@
       data.rewards.forEach(r => {
         const div = document.createElement("div");
         div.className = "reward" + (level >= r.level ? " unlocked" : "");
-        div.innerHTML = `
-          <div style="font-size:4rem">${r.icon}</div>
-          <h3>${r.name}</h3>
-          <p>${r.desc} (레벨 ${r.level})</p>
-        `;
+        div.innerHTML = `<div class="reward-icon">${r.icon}</div><h3>${r.name}</h3><p>${r.desc}<br>(레벨 ${r.level})</p>`;
         grid.appendChild(div);
       });
     }
@@ -306,11 +295,10 @@
       container.innerHTML = "";
       data.levelReqs.forEach((req, i) => {
         const div = document.createElement("div");
-        div.style = "margin-bottom:1rem;padding:1rem;background:#333;border-radius:8px;";
-        div.innerHTML = `
-          레벨 ${req.toLevel} 도달 필요 reps <input type="number" value="${req.requiredReps}" data-index="${i}" class="level-req-reps">
-          <button class="danger remove-level-req" data-index="${i}">삭제</button>
-        `;
+        div.style = "margin:1rem 0;padding:1rem;background:#2a2a2a;border-radius:8px;";
+        div.innerHTML = `레벨 ${req.toLevel} → 필요 ${req.requiredReps} reps 
+          <input type="number" value="${req.requiredReps}" data-index="${i}" class="level-req-reps" style="width:120px;margin-left:10px;">
+          <button class="danger remove-level-req" data-index="${i}" style="margin-left:10px;">삭제</button>`;
         container.appendChild(div);
       });
     }
@@ -320,41 +308,32 @@
       container.innerHTML = "";
       data.rewards.forEach((r, i) => {
         const div = document.createElement("div");
-        div.style = "margin-bottom:1rem;padding:1rem;background:#333;border-radius:8px;";
-        div.innerHTML = `
-          레벨 <input type="number" value="${r.level}" data-index="${i}" class="reward-level">
+        div.style = "margin:1rem 0;padding:1rem;background:#2a2a2a;border-radius:8px;";
+        div.innerHTML = `레벨 <input type="number" value="${r.level}" data-index="${i}" class="reward-level" style="width:70px;">
           이름 <input type="text" value="${r.name}" data-index="${i}" class="reward-name">
           설명 <input type="text" value="${r.desc}" data-index="${i}" class="reward-desc">
-          아이콘 <input type="text" value="${r.icon}" data-index="${i}" class="reward-icon">
-          <button class="danger remove-reward" data-index="${i}">삭제</button>
-        `;
+          아이콘 <input type="text" value="${r.icon}" data-index="${i}" class="reward-icon" style="width:80px;">
+          <button class="danger remove-reward" data-index="${i}">삭제</button>`;
         container.appendChild(div);
       });
-    }
-
-    function addLevelReq() {
-      const next = data.levelReqs.length ? Math.max(...data.levelReqs.map(r => r.toLevel)) + 1 : 2;
-      data.levelReqs.push({toLevel: next, requiredReps: 1000});
-      saveData();
-      renderLevelReqsEdit();
-      updateHeader();
-    }
-
-    function addReward() {
-      const nextLevel = getLevelInfo().currentLevel + 1;
-      data.rewards.push({level: nextLevel, name:"새 보상", desc:"설명", icon:"🏆"});
-      saveData();
-      renderRewardsEdit();
     }
 
     // Event Listeners
     document.getElementById("record-date").value = new Date().toISOString().slice(0,10);
     document.getElementById("record-date").addEventListener("change", loadTodayRecords);
-
     document.getElementById("add-exercise-btn").addEventListener("click", addExercise);
     document.getElementById("save-today-btn").addEventListener("click", saveToday);
-    document.getElementById("add-level-req-btn").addEventListener("click", addLevelReq);
-    document.getElementById("add-reward-btn").addEventListener("click", addReward);
+    document.getElementById("auto-quadratic-btn").addEventListener("click", () => {
+      data.levelReqs = generateQuadratic(200, 21);
+      saveData();
+      renderLevelReqsEdit();
+      updateHeader();
+    });
+    document.getElementById("add-reward-btn").addEventListener("click", () => {
+      data.rewards.push({level: getLevelInfo().currentLevel + 1, name:"새 보상", desc:"설명", icon:"🏆"});
+      saveData();
+      renderRewardsEdit();
+    });
 
     document.querySelectorAll(".tab").forEach(tab => {
       tab.addEventListener("click", () => {
@@ -363,10 +342,7 @@
         tab.classList.add("active");
         document.getElementById(tab.dataset.tab).classList.add("active");
         if (tab.dataset.tab === "today") loadTodayRecords();
-        if (tab.dataset.tab === "settings") {
-          renderLevelReqsEdit();
-          renderRewardsEdit();
-        }
+        if (tab.dataset.tab === "settings") { renderLevelReqsEdit(); renderRewardsEdit(); }
         if (tab.dataset.tab === "chart") updateChart();
       });
     });
@@ -374,12 +350,12 @@
     document.getElementById("exercise-list").addEventListener("change", e => {
       if (e.target.classList.contains("ex-name")) {
         const i = e.target.dataset.index;
-        const oldName = data.exercises[i].name;
+        const old = data.exercises[i].name;
         data.exercises[i].name = e.target.value;
         for (const date in data.history) {
-          if (data.history[date][oldName] !== undefined) {
-            data.history[date][e.target.value] = data.history[date][oldName];
-            delete data.history[date][oldName];
+          if (data.history[date][old] !== undefined) {
+            data.history[date][e.target.value] = data.history[date][old];
+            delete data.history[date][old];
           }
         }
         saveData();
