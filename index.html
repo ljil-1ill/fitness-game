@@ -43,8 +43,6 @@
     .level-up.show { display: flex; }
     .level-up h2 { font-size: 4rem; color: var(--primary); animation: bounce 1s infinite; }
     @keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
-    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-    th, td { padding: 0.5rem; border: 1px solid #444; }
     input[type="date"] { background: #444; color: #eee; border: none; padding: 0.5rem; border-radius: 4px; }
   </style>
 </head>
@@ -57,7 +55,7 @@
         <circle class="progress-circle" cx="100" cy="100" r="90"/>
         <circle class="progress-fill" cx="100" cy="100" r="90" stroke-dasharray="565" stroke-dashoffset="565" transform="rotate(-90 100 100)"/>
       </svg>
-      <div class="progress-text"><span id="progress-text">0 / 1000</span></div>
+      <div class="progress-text"><span id="progress-text">0 남음</span></div>
     </div>
     <p id="total-reps">총 누적: 0 reps</p>
   </header>
@@ -65,7 +63,7 @@
   <main>
     <div class="card exercises">
       <div class="tabs">
-        <div class="tab active" data-tab="today">오늘 기록</div>
+        <div class="tab active" data-tab="today">기록 입력</div>
         <div class="tab" data-tab="chart">히스토리 차트</div>
         <div class="tab" data-tab="settings">설정</div>
       </div>
@@ -83,7 +81,7 @@
 
       <div id="settings" class="tab-content">
         <h3>레벨업 기준 (차등 적용)</h3>
-        <p>각 레벨로 올라가기 위해 필요한 추가 reps를 설정하세요.</p>
+        <p>각 레벨로 올라가기 위해 필요한 추가 reps</p>
         <div id="level-reqs-edit"></div>
         <button id="add-level-req-btn">+ 레벨 기준 추가</button>
 
@@ -123,7 +121,7 @@
 
     let data = {
       exercises: defaultExercises.map(name => ({name})),
-      history: {}, // "2026-01-13": {"풀업": 10, "푸쉬업": 20, ...}
+      history: {}, // "2026-01-13": {"풀업": 50, "푸쉬업": 100, ...}
       rewards: defaultRewards,
       levelReqs: defaultLevelReqs
     };
@@ -150,16 +148,19 @@
       const total = getTotalReps();
       let cumulative = 0;
       let currentLevel = 1;
-      let nextReq = data.levelReqs.find(r => r.toLevel === 2)?.requiredReps || 0;
-      for (const req of data.levelReqs) {
+      let nextReq = data.levelReqs[0]?.requiredReps || 0;
+      let currentReqIndex = 0;
+      for (let i = 0; i < data.levelReqs.length; i++) {
+        const req = data.levelReqs[i];
         if (cumulative + req.requiredReps > total) {
           nextReq = req.requiredReps - (total - cumulative);
+          currentReqIndex = i;
           break;
         }
         cumulative += req.requiredReps;
         currentLevel = req.toLevel;
       }
-      const percent = nextReq > 0 ? ((req?.requiredReps || 0) - nextReq) / (req?.requiredReps || 0) * 100 : 100;
+      const percent = data.levelReqs[currentReqIndex] ? ((data.levelReqs[currentReqIndex].requiredReps - nextReq) / data.levelReqs[currentReqIndex].requiredReps) * 100 : 100;
       return { currentLevel, nextReps: nextReq, percent, cumulative };
     }
 
@@ -167,7 +168,7 @@
       const prevLevel = document.getElementById("current-level").textContent;
       const info = getLevelInfo();
       document.getElementById("current-level").textContent = info.currentLevel;
-      document.getElementById("progress-text").textContent = `${info.nextReps > 0 ? info.nextReps : 0} 남음`;
+      document.getElementById("progress-text").textContent = info.nextReps > 0 ? `${info.nextReps} reps 남음` : "최고 레벨!";
       document.getElementById("total-reps").textContent = `총 누적: ${getTotalReps()} reps`;
 
       const circumference = 565;
@@ -182,15 +183,22 @@
       renderRewards();
     }
 
-    function renderExercises() {
+    function loadTodayRecords() {
+      const selectedDate = document.getElementById("record-date").value || new Date().toISOString().slice(0,10);
+      renderExercises(selectedDate);
+    }
+
+    function renderExercises(date = null) {
+      const selectedDate = date || document.getElementById("record-date").value || new Date().toISOString().slice(0,10);
       const list = document.getElementById("exercise-list");
       list.innerHTML = "";
       data.exercises.forEach((ex, i) => {
+        const savedReps = data.history[selectedDate] && data.history[selectedDate][ex.name] ? data.history[selectedDate][ex.name] : 0;
         const div = document.createElement("div");
         div.className = "exercise-item";
         div.innerHTML = `
           <input type="text" value="${ex.name}" data-index="${i}" class="ex-name">
-          <input type="number" min="0" value="0" data-index="${i}" class="ex-reps">
+          <input type="number" min="0" value="${savedReps}" data-index="${i}" class="ex-reps">
           <button class="danger remove-ex" data-index="${i}">삭제</button>
         `;
         list.appendChild(div);
@@ -200,18 +208,17 @@
     function addExercise() {
       data.exercises.push({name: "새 운동"});
       saveData();
-      renderExercises();
+      loadTodayRecords();
     }
 
     function removeExercise(i) {
       const name = data.exercises[i].name;
       data.exercises.splice(i, 1);
-      // 과거 기록에서도 삭제
       for (const date in data.history) {
         delete data.history[date][name];
       }
       saveData();
-      renderExercises();
+      loadTodayRecords();
       updateChart();
       updateHeader();
     }
@@ -225,17 +232,16 @@
         const name = data.exercises[i].name;
         const reps = Number(input.value) || 0;
         if (reps > 0) {
-          data.history[selectedDate][name] = (data.history[selectedDate][name] || 0) + reps;
+          data.history[selectedDate][name] = reps; // 덮어쓰기 (기존 + 추가가 아닌 현재 값 전체 저장)
           dailyTotal += reps;
-          input.value = 0;
+        } else {
+          delete data.history[selectedDate][name];
         }
       });
-      if (dailyTotal > 0) {
-        saveData();
-        updateChart();
-        updateHeader();
-        alert(`${selectedDate} 기록이 저장되었습니다! (+${dailyTotal} reps)`);
-      }
+      saveData();
+      updateChart();
+      updateHeader();
+      alert(`${selectedDate} 기록이 저장되었습니다! (총 ${dailyTotal} reps)`);
     }
 
     let chart;
@@ -244,13 +250,13 @@
       const datasets = [];
       const colors = ["#4CAF50", "#2196F3", "#FF9800", "#F44336", "#9C27B0", "#00BCD4", "#FFEB3B", "#795548"];
 
-      // 총합 데이터셋
+      // 총합
       const totalData = sortedDates.map(date => {
         let sum = 0;
         for (const ex in data.history[date]) sum += data.history[date][ex];
         let cumulative = sum;
-        for (let i = 0; i < sortedDates.indexOf(date); i++) {
-          for (const ex in data.history[sortedDates[i]]) cumulative += data.history[sortedDates[i]][ex];
+        for (let d of sortedDates.filter(d => d < date)) {
+          for (const ex in data.history[d]) cumulative += data.history[d][ex];
         }
         return cumulative;
       });
@@ -263,13 +269,13 @@
         fill: true
       });
 
-      // 종목별 데이터셋
+      // 종목별
       data.exercises.forEach((ex, idx) => {
         const color = colors[idx % colors.length];
         const exData = sortedDates.map(date => {
           let cumulative = data.history[date][ex.name] || 0;
-          for (let i = 0; i < sortedDates.indexOf(date); i++) {
-            cumulative += data.history[sortedDates[i]][ex.name] || 0;
+          for (let d of sortedDates.filter(d => d < date)) {
+            cumulative += data.history[d][ex.name] || 0;
           }
           return cumulative;
         });
@@ -311,7 +317,7 @@
 
     function renderLevelReqsEdit() {
       const container = document.getElementById("level-reqs-edit");
-      container.innerHTML = "<h4>레벨업 필요 reps 목록</h4>";
+      container.innerHTML = "";
       data.levelReqs.forEach((req, i) => {
         const div = document.createElement("div");
         div.style = "margin-bottom:1rem;padding:1rem;background:#333;border-radius:8px;";
@@ -325,7 +331,7 @@
 
     function renderRewardsEdit() {
       const container = document.getElementById("rewards-edit");
-      container.innerHTML = "<h4>보상 목록</h4>";
+      container.innerHTML = "";
       data.rewards.forEach((r, i) => {
         const div = document.createElement("div");
         div.style = "margin-bottom:1rem;padding:1rem;background:#333;border-radius:8px;";
@@ -356,6 +362,7 @@
 
     // Event Listeners
     document.getElementById("record-date").value = new Date().toISOString().slice(0,10);
+    document.getElementById("record-date").addEventListener("change", loadTodayRecords);
 
     document.getElementById("add-exercise-btn").addEventListener("click", addExercise);
     document.getElementById("save-today-btn").addEventListener("click", saveToday);
@@ -368,6 +375,7 @@
         document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
         tab.classList.add("active");
         document.getElementById(tab.dataset.tab).classList.add("active");
+        if (tab.dataset.tab === "today") loadTodayRecords();
         if (tab.dataset.tab === "settings") {
           renderLevelReqsEdit();
           renderRewardsEdit();
@@ -378,7 +386,15 @@
     document.getElementById("exercise-list").addEventListener("change", e => {
       if (e.target.classList.contains("ex-name")) {
         const i = e.target.dataset.index;
+        const oldName = data.exercises[i].name;
         data.exercises[i].name = e.target.value;
+        // 과거 기록 이름도 업데이트
+        for (const date in data.history) {
+          if (data.history[date][oldName] !== undefined) {
+            data.history[date][e.target.value] = data.history[date][oldName];
+            delete data.history[date][oldName];
+          }
+        }
         saveData();
         updateChart();
       }
@@ -426,7 +442,7 @@
     });
 
     // Init
-    renderExercises();
+    loadTodayRecords();
     updateHeader();
     updateChart();
     renderRewards();
