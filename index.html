@@ -5,11 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>운동 게임 대시보드</title>
 
-  <!-- FullCalendar CDN -->
-  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet" />
+  <!-- FullCalendar (v6는 JS가 CSS를 주입하므로 CSS link는 제거) -->
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
 
-  <!-- Chart.js CDN -->
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
   <style>
@@ -49,13 +48,20 @@
       gap: 1rem;
     }
     @media (min-width: 900px) { main { grid-template-columns: 1fr 400px; } }
+
     .calendar-section {
       background: var(--dark);
       padding: 1rem;
       border-radius: 12px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.6);
     }
-    #calendar { max-width: 100%; background: #222; padding: 1rem; border-radius: 8px; }
+    #calendar {
+      max-width: 100%;
+      background: #222;
+      padding: 1rem;
+      border-radius: 8px;
+    }
+
     .sidebar { display: flex; flex-direction: column; gap: 1rem; }
     .card {
       background: var(--dark);
@@ -112,7 +118,12 @@
       margin-bottom: 0.5rem;
       font-size: 1.1rem;
     }
-    canvas { max-width: 100%; background: #222; border-radius: 8px; padding: 1rem; }
+    canvas {
+      max-width: 100%;
+      background: #222;
+      border-radius: 8px;
+      padding: 1rem;
+    }
     .fc-event { font-size: 0.9rem; padding: 2px 4px; }
   </style>
 </head>
@@ -154,19 +165,29 @@
   <script>
     const defaultExercises = ["풀업", "푸쉬업", "앱슬라이드", "스쿼트", "카프레이즈"];
 
-    // 로컬 날짜(YYYY-MM-DD) 안전 생성 (UTC 오프셋 문제 방지)
-    function getLocalDateStr(d = new Date()) {
-      const tzOffsetMs = d.getTimezoneOffset() * 60000;
-      return new Date(d.getTime() - tzOffsetMs).toISOString().slice(0, 10);
-    }
-
-    // HTML attribute/value 안전 처리 (운동명에 따옴표 등 포함 시 깨짐 방지)
     function escapeAttr(str) {
       return String(str)
         .replace(/&/g, "&amp;")
         .replace(/"/g, "&quot;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
+    }
+
+    // 어떤 형태의 날짜 입력이 와도 YYYY-MM-DD로 강제
+    function normalizeYMD(input) {
+      if (typeof input === "string") {
+        const m = input.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+      }
+      const d = (input instanceof Date) ? input : new Date(input);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    }
+
+    function getLocalTodayYMD() {
+      return normalizeYMD(new Date());
     }
 
     let data = {
@@ -183,9 +204,15 @@
       return reqs;
     }
 
-    // localStorage 로드
-    if (localStorage.getItem("fitnessGameData")) {
-      const loaded = JSON.parse(localStorage.getItem("fitnessGameData"));
+    function saveData() {
+      localStorage.setItem("fitnessGameData", JSON.stringify(data));
+    }
+
+    function loadData() {
+      const raw = localStorage.getItem("fitnessGameData");
+      if (!raw) return;
+
+      const loaded = JSON.parse(raw);
       data = {
         exercises: loaded.exercises || defaultExercises.map(name => ({ name })),
         history: loaded.history || {},
@@ -193,21 +220,43 @@
       };
     }
 
-    // 첫 실행 또는 levelReqs 없을 때 Quadratic 적용
-    if (!Array.isArray(data.levelReqs) || data.levelReqs.length === 0) {
-      data.levelReqs = generateQuadratic();
-      saveData();
+    // 과거 버전에서 날짜 키가 YYYY-MM-DD가 아닐 수도 있으니 일괄 정규화(중복 키는 exercise별로 큰 값 우선)
+    function normalizeHistoryKeysInPlace() {
+      const newHistory = {};
+
+      for (const key in data.history) {
+        const norm = normalizeYMD(key);
+        const day = data.history[key] || {};
+
+        if (!newHistory[norm]) newHistory[norm] = {};
+
+        for (const exName in day) {
+          const v = Number(day[exName]) || 0;
+          if (v <= 0) continue;
+
+          // 중복이 있으면 max로 (합산으로 인한 중복 카운트 방지)
+          newHistory[norm][exName] = Math.max(newHistory[norm][exName] || 0, v);
+        }
+      }
+
+      data.history = newHistory;
     }
 
-    function saveData() {
-      localStorage.setItem("fitnessGameData", JSON.stringify(data));
+    // 초기 로드
+    loadData();
+
+    if (!Array.isArray(data.levelReqs) || data.levelReqs.length === 0) {
+      data.levelReqs = generateQuadratic(200, 21);
     }
+
+    normalizeHistoryKeysInPlace();
+    saveData();
 
     function getTotalReps() {
       let total = 0;
       for (const date in data.history) {
         const day = data.history[date] || {};
-        for (const ex in day) total += day[ex] || 0;
+        for (const ex in day) total += (Number(day[ex]) || 0);
       }
       return total;
     }
@@ -215,7 +264,7 @@
     function getExerciseCumulative(exName) {
       let cum = 0;
       for (const date in data.history) {
-        cum += (data.history[date]?.[exName] || 0);
+        cum += (Number(data.history[date]?.[exName]) || 0);
       }
       return cum;
     }
@@ -249,53 +298,20 @@
       });
     }
 
+    let selectedDate = getLocalTodayYMD();
     let calendar;
-    let selectedDate = getLocalDateStr();
 
-    function initCalendar() {
-      calendar = new FullCalendar.Calendar(document.getElementById("calendar"), {
-        initialView: 'dayGridMonth',
-        headerToolbar: {
-          left: 'prev,next today',
-          center: 'title',
-          right: 'dayGridMonth,timeGridWeek'
-        },
-
-        // 빈 날짜 클릭
-        dateClick: function(info) {
-          selectedDate = (info.dateStr || "").slice(0, 10); // week view에서도 YYYY-MM-DD로 정규화
-          document.getElementById("selected-date-title").textContent = `${selectedDate} 기록`;
-          loadExercisesForDate(selectedDate);
-        },
-
-        // 기록이 있는 이벤트(초록 박스) 클릭해도 편집 가능하게
-        eventClick: function(info) {
-          // all-day 이벤트는 startStr이 "YYYY-MM-DD"로 들어오는 경우가 대부분이라 이게 가장 안전
-          const ymd = (info.event.startStr || "").slice(0, 10) ||
-                      (info.event.start ? info.event.start.toISOString().slice(0, 10) : selectedDate);
-          selectedDate = ymd;
-          document.getElementById("selected-date-title").textContent = `${selectedDate} 기록`;
-          loadExercisesForDate(selectedDate);
-        },
-
-        events: getCalendarEvents(),
-        eventDidMount: function(info) {
-          info.el.title = info.event.extendedProps.tooltip;
-        }
-      });
-
-      calendar.render();
-    }
-
-    function getCalendarEvents() {
+    function getCalendarEventsArray() {
       const events = [];
-      for (const date in data.history) {
-        const day = data.history[date] || {};
+      for (const dateKey in data.history) {
+        const date = normalizeYMD(dateKey);
+        const day = data.history[dateKey] || {};
+
         let total = 0;
         const details = [];
 
         for (const ex in day) {
-          const reps = day[ex] || 0;
+          const reps = Number(day[ex]) || 0;
           total += reps;
           details.push(`${ex}: ${reps}`);
         }
@@ -303,7 +319,8 @@
         if (total > 0) {
           events.push({
             title: `총 ${total} reps`,
-            start: date, // YYYY-MM-DD (all-day)
+            start: date, // 반드시 YYYY-MM-DD
+            allDay: true,
             tooltip: details.join('\n'),
             backgroundColor: '#4CAF50',
             borderColor: '#4CAF50'
@@ -313,12 +330,45 @@
       return events;
     }
 
+    function initCalendar() {
+      calendar = new FullCalendar.Calendar(document.getElementById("calendar"), {
+        initialView: "dayGridMonth",
+        headerToolbar: { left: "prev,next today", center: "title", right: "dayGridMonth,timeGridWeek" },
+
+        // 핵심: events를 "함수형 소스"로 제공 -> 데이터 변경 후 refetchEvents()로 항상 최신 반영
+        events: function(fetchInfo, successCallback) {
+          successCallback(getCalendarEventsArray());
+        },
+
+        dateClick: function(info) {
+          selectedDate = normalizeYMD(info.dateStr);
+          document.getElementById("selected-date-title").textContent = `${selectedDate} 기록`;
+          loadExercisesForDate(selectedDate);
+        },
+
+        eventClick: function(info) {
+          // startStr이 YYYY-MM-DD 형태로 가장 안전
+          selectedDate = normalizeYMD(info.event.startStr || info.event.start);
+          document.getElementById("selected-date-title").textContent = `${selectedDate} 기록`;
+          loadExercisesForDate(selectedDate);
+        },
+
+        eventDidMount: function(info) {
+          info.el.title = info.event.extendedProps.tooltip;
+        }
+      });
+
+      calendar.render();
+    }
+
     function loadExercisesForDate(date) {
+      const ymd = normalizeYMD(date);
       const list = document.getElementById("exercise-list");
       list.innerHTML = "";
 
       data.exercises.forEach((ex, i) => {
-        const saved = data.history[date]?.[ex.name] || 0;
+        const saved = Number(data.history[ymd]?.[ex.name]) || 0;
+
         const div = document.createElement("div");
         div.className = "exercise-item";
         div.innerHTML = `
@@ -347,6 +397,7 @@
       for (const date in data.history) {
         if (data.history[date] && data.history[date][name] !== undefined) {
           delete data.history[date][name];
+          if (Object.keys(data.history[date]).length === 0) delete data.history[date];
         }
       }
 
@@ -356,9 +407,11 @@
     }
 
     function saveToday() {
-      const date = selectedDate;
+      const date = normalizeYMD(selectedDate);
+      selectedDate = date;
 
       if (!data.history[date]) data.history[date] = {};
+
       let daily = 0;
 
       document.querySelectorAll(".ex-reps").forEach(inp => {
@@ -376,23 +429,29 @@
         }
       });
 
-      // 날짜에 아무 기록도 없으면 깔끔하게 제거(선택 사항)
       if (Object.keys(data.history[date]).length === 0) {
         delete data.history[date];
       }
 
       saveData();
+      // 저장 직후 폼을 다시 로드해서 “저장된 값 기준”으로 확정 표시
+      loadExercisesForDate(selectedDate);
       updateAll();
+
       alert(`${date} 기록 저장! (+${daily} reps)`);
     }
 
     let perChart;
 
     function updatePerExerciseChart() {
-      const dates = Object.keys(data.history).sort();
-      const canvas = document.getElementById("perExerciseChart");
+      // 날짜 키를 정규화한 리스트로 만든다
+      const rawKeys = Object.keys(data.history);
+      const dates = rawKeys.map(k => normalizeYMD(k)).sort();
 
-      // 기존 차트가 남아있으면 무조건 파괴 (캔버스 점유 해제)
+      // 중복 날짜가 생길 수 있으니 unique
+      const uniqDates = [...new Set(dates)];
+
+      const canvas = document.getElementById("perExerciseChart");
       const existing = Chart.getChart(canvas);
       if (existing) existing.destroy();
 
@@ -400,8 +459,9 @@
         const color = ["#4CAF50","#2196F3","#FF9800","#F44336","#9C27B0","#00BCD4","#FFEB3B","#795548"][i % 8];
 
         let running = 0;
-        const cumData = dates.map(date => {
-          running += (data.history[date]?.[ex.name] || 0);
+        const cumData = uniqDates.map(date => {
+          // date는 정규화되어 있으므로 그대로 접근
+          running += (Number(data.history[date]?.[ex.name]) || 0);
           return running;
         });
 
@@ -417,30 +477,29 @@
 
       perChart = new Chart(canvas, {
         type: "line",
-        data: { labels: dates, datasets },
+        data: { labels: uniqDates, datasets },
         options: {
           scales: {
-            x: { type: "category" },   // time 축 제거 → date adapter 불필요
+            x: { type: "category" },
             y: { beginAtZero: true }
           },
-          plugins: {
-            legend: { position: "bottom" }
-          }
+          plugins: { legend: { position: "bottom" } }
         }
       });
     }
 
     function updateAll() {
-      if (calendar) {
-        calendar.removeAllEvents();
-        calendar.addEventSource(getCalendarEvents());
-      }
       updateTotalInfo();
       updateLevelList();
       updatePerExerciseChart();
+
+      if (calendar) {
+        // 핵심: 함수형 events 소스이므로 refetchEvents()만 하면 최신 반영
+        calendar.refetchEvents();
+      }
     }
 
-    // Event Listeners
+    // Listeners
     document.getElementById("add-exercise-btn").addEventListener("click", addExercise);
     document.getElementById("save-today-btn").addEventListener("click", saveToday);
 
@@ -450,35 +509,32 @@
       updateAll();
     });
 
-    // 운동명 변경 시 history 키도 같이 변경
     document.getElementById("exercise-list").addEventListener("change", e => {
-      if (e.target.classList.contains("ex-name")) {
-        const idx = Number(e.target.dataset.index);
-        if (!Number.isFinite(idx) || idx < 0 || idx >= data.exercises.length) return;
+      if (!e.target.classList.contains("ex-name")) return;
 
-        const oldName = data.exercises[idx].name;
-        const newName = (e.target.value || "").trim() || "새 운동";
+      const idx = Number(e.target.dataset.index);
+      if (!Number.isFinite(idx) || idx < 0 || idx >= data.exercises.length) return;
 
-        if (oldName === newName) return;
+      const oldName = data.exercises[idx].name;
+      const newName = (e.target.value || "").trim() || "새 운동";
+      if (oldName === newName) return;
 
-        data.exercises[idx].name = newName;
+      data.exercises[idx].name = newName;
 
-        // 기존 기록 키 마이그레이션
-        for (const date in data.history) {
-          const day = data.history[date];
-          if (!day) continue;
+      // history 키 마이그레이션 (중복 시 max)
+      for (const date in data.history) {
+        const day = data.history[date];
+        if (!day) continue;
 
-          if (day[oldName] !== undefined) {
-            // 새 이름이 이미 존재하면 합산(원하면 덮어쓰기/경고로 변경 가능)
-            day[newName] = (day[newName] || 0) + (day[oldName] || 0);
-            delete day[oldName];
-          }
+        if (day[oldName] !== undefined) {
+          day[newName] = Math.max(Number(day[newName]) || 0, Number(day[oldName]) || 0);
+          delete day[oldName];
         }
-
-        saveData();
-        loadExercisesForDate(selectedDate);
-        updateAll();
       }
+
+      saveData();
+      loadExercisesForDate(selectedDate);
+      updateAll();
     });
 
     document.getElementById("exercise-list").addEventListener("click", e => {
@@ -488,8 +544,10 @@
     });
 
     // Init
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener("DOMContentLoaded", () => {
+      selectedDate = getLocalTodayYMD();
       document.getElementById("selected-date-title").textContent = `${selectedDate} 기록`;
+
       initCalendar();
       loadExercisesForDate(selectedDate);
       updateAll();
