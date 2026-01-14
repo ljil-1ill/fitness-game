@@ -78,8 +78,8 @@
 
     let data = {
       exercises: defaultExercises.map(name => ({name})),
-      history: {}, // "2026-01-14": {"풀업": 50, "푸쉬업": 100}
-      levelReqs: [] // Quadratic 자동 생성
+      history: {},
+      levelReqs: [] // 반드시 배열로 초기화
     };
 
     function generateQuadratic(base = 200, maxLevel = 20) {
@@ -90,10 +90,18 @@
       return reqs;
     }
 
+    // localStorage 로드 시 안전하게 처리
     if (localStorage.getItem("fitnessGameData")) {
-      data = JSON.parse(localStorage.getItem("fitnessGameData"));
+      const loaded = JSON.parse(localStorage.getItem("fitnessGameData"));
+      data = {
+        exercises: loaded.exercises || defaultExercises.map(name => ({name})),
+        history: loaded.history || {},
+        levelReqs: loaded.levelReqs || []
+      };
     }
-    if (data.levelReqs.length === 0) {
+
+    // 첫 실행 또는 levelReqs 없을 때 Quadratic 적용
+    if (!Array.isArray(data.levelReqs) || data.levelReqs.length === 0) {
       data.levelReqs = generateQuadratic();
       saveData();
     }
@@ -265,7 +273,13 @@
       perChart = new Chart(document.getElementById("perExerciseChart"), {
         type: "line",
         data: { labels: dates, datasets },
-        options: { scales: { x: { type: "time", time: { unit: "day" } } } }
+        options: { 
+          scales: { 
+            x: { type: "time", time: { unit: "day" } },
+            y: { beginAtZero: true }
+          },
+          plugins: { legend: { position: "bottom" } }
+        }
       });
     }
 
@@ -279,6 +293,7 @@
 
     // Event Listeners
     document.getElementById("selected-date-title").textContent = `${selectedDate} 기록`;
+
     document.getElementById("add-exercise-btn").addEventListener("click", addExercise);
     document.getElementById("save-today-btn").addEventListener("click", saveToday);
     document.getElementById("auto-quadratic-btn").addEventListener("click", () => {
@@ -304,7 +319,9 @@
     });
 
     document.getElementById("exercise-list").addEventListener("click", e => {
-      if (e.target.classList.contains("remove-ex")) removeExercise(e.target.dataset.index);
+      if (e.target.classList.contains("remove-ex")) {
+        removeExercise(e.target.dataset.index);
+      }
     });
 
     // Init
