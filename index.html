@@ -3,555 +3,1167 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>운동 게임 대시보드</title>
+  <title>운동 대시보드 (종목별)</title>
 
-  <!-- FullCalendar (v6는 JS가 CSS를 주입하므로 CSS link는 제거) -->
+  <!-- FullCalendar -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css">
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
 
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
   <style>
-    :root {
-      --primary: #4CAF50;
-      --dark: #1a1a1a;
-      --darker: #111;
-      --accent: #FF5722;
-      --text: #eee;
+    :root{
+      --bg: #0e1116;
+      --panel: #151a22;
+      --panel2:#121722;
+      --card:#171d28;
+      --line:#2a3344;
+      --text:#e7edf6;
+      --muted:#a9b6c9;
+      --accent:#5ee38f;
+      --danger:#ff5a5f;
+      --warn:#ffb020;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --radius: 14px;
     }
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      background: var(--darker);
-      color: var(--text);
+    *{box-sizing:border-box}
+    body{
       margin:0;
-      padding:0;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", Helvetica, Arial, sans-serif;
+      background: radial-gradient(1200px 600px at 20% -10%, rgba(94,227,143,.12), transparent 60%),
+                  radial-gradient(900px 500px at 110% 10%, rgba(76,150,255,.10), transparent 55%),
+                  var(--bg);
+      color: var(--text);
+      min-height:100vh;
     }
-    header {
-      background: linear-gradient(135deg, var(--primary), #2e7d32);
-      padding: 1.5rem 1rem;
-      text-align: center;
+
+    header{
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(14,17,22,.82);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(255,255,255,.06);
     }
-    h1 { margin:0; font-size: 2rem; }
-    .total-info { font-size: 1.2rem; margin-top: 0.5rem; }
-    main {
-      flex: 1;
-      max-width: 1200px;
+    .header-inner{
+      max-width: 1280px;
       margin: 0 auto;
-      padding: 1rem;
-      width: 100%;
-      box-sizing: border-box;
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 1rem;
+      padding: 14px 16px;
+      display:flex;
+      gap:16px;
+      align-items:center;
+      justify-content:space-between;
     }
-    @media (min-width: 900px) { main { grid-template-columns: 1fr 400px; } }
+    .brand{
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+      min-width: 240px;
+    }
+    .brand h1{
+      margin:0;
+      font-size: 18px;
+      letter-spacing: .2px;
+      font-weight: 700;
+    }
+    .brand .sub{
+      margin:0;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
 
-    .calendar-section {
-      background: var(--dark);
-      padding: 1rem;
-      border-radius: 12px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+    .date-controls{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+      justify-content:flex-end;
     }
-    #calendar {
-      max-width: 100%;
-      background: #222;
-      padding: 1rem;
-      border-radius: 8px;
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.10);
+      padding: 8px 10px;
+      border-radius: 999px;
     }
+    .pill strong{
+      font-size: 13px;
+      letter-spacing: .2px;
+    }
+    .status{
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .status.saving{ color: var(--warn); }
+    .status.saved{ color: rgba(94,227,143,.95); }
 
-    .sidebar { display: flex; flex-direction: column; gap: 1rem; }
-    .card {
-      background: var(--dark);
-      padding: 1.5rem;
-      border-radius: 12px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+    button{
+      border: 0;
+      background: rgba(255,255,255,.08);
+      color: var(--text);
+      padding: 10px 12px;
+      border-radius: 10px;
+      cursor:pointer;
+      transition: transform .06s ease, background .2s ease, opacity .2s ease;
+      user-select:none;
     }
-    .exercise-item {
-      display: grid;
-      grid-template-columns: 2fr 1fr 60px;
-      gap: 1rem;
-      align-items: center;
-      padding: 0.8rem;
-      background: #2a2a2a;
-      border-radius: 8px;
-      margin-bottom: 0.8rem;
+    button:hover{ background: rgba(255,255,255,.12); }
+    button:active{ transform: translateY(1px); }
+    button.primary{
+      background: rgba(94,227,143,.14);
+      border: 1px solid rgba(94,227,143,.25);
     }
-    .exercise-item input[type="text"] {
+    button.primary:hover{ background: rgba(94,227,143,.20); }
+    button.danger{
+      background: rgba(255,90,95,.12);
+      border: 1px solid rgba(255,90,95,.22);
+    }
+    button.danger:hover{ background: rgba(255,90,95,.18); }
+    button.ghost{
       background: transparent;
-      border: none;
+      border: 1px solid rgba(255,255,255,.12);
+    }
+
+    input[type="date"],
+    input[type="number"],
+    input[type="text"],
+    select{
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.12);
       color: var(--text);
-      font-size: 1.1rem;
-      width: 100%;
+      border-radius: 10px;
+      padding: 10px 10px;
       outline: none;
+      min-height: 40px;
     }
-    .exercise-item input[type="number"] {
-      background: #444;
-      border: none;
-      color: var(--text);
-      padding: 0.6rem;
-      border-radius: 4px;
-      text-align: center;
-      width: 100%;
-      box-sizing: border-box;
-      outline: none;
+    input[type="date"]{ padding: 8px 10px; }
+    input[type="number"]{ text-align: right; }
+
+    .wrap{
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 16px;
+      display:grid;
+      grid-template-columns: 380px 1fr;
+      gap: 16px;
     }
-    button {
-      background: var(--primary);
-      border: none;
-      color: white;
-      padding: 0.8rem 1.2rem;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: 0.3s;
+    @media (max-width: 1040px){
+      .wrap{ grid-template-columns: 1fr; }
     }
-    button:hover { background: #66bb6a; }
-    button.danger { background: var(--accent); }
-    button.danger:hover { background: #f44336; }
-    .level-list { margin-top: 1rem; }
-    .level-item {
-      padding: 0.5rem;
-      background: #2a2a2a;
-      border-radius: 6px;
-      margin-bottom: 0.5rem;
-      font-size: 1.1rem;
+
+    .panel{
+      background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow:hidden;
     }
-    canvas {
-      max-width: 100%;
-      background: #222;
+    .panel .panel-head{
+      padding: 14px 14px 10px 14px;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap: 10px;
+    }
+    .panel-title{
+      font-size: 13px;
+      color: rgba(231,237,246,.92);
+      font-weight: 700;
+      letter-spacing: .2px;
+      margin:0;
+    }
+    .panel-sub{
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 6px;
+      line-height:1.35;
+    }
+    .panel-body{
+      padding: 14px;
+    }
+
+    /* Calendar tweaks */
+    #calendar{
+      background: rgba(0,0,0,.12);
+      border-radius: 12px;
+      padding: 10px;
+      border: 1px solid rgba(255,255,255,.06);
+    }
+    .fc .fc-toolbar-title{ font-size: 14px !important; }
+    .fc .fc-button{
+      background: rgba(255,255,255,.10) !important;
+      border: 1px solid rgba(255,255,255,.10) !important;
+      color: var(--text) !important;
+      border-radius: 10px !important;
+      padding: 6px 10px !important;
+      box-shadow: none !important;
+      text-transform: none !important;
+    }
+    .fc .fc-button:hover{ background: rgba(255,255,255,.14) !important; }
+    .fc .fc-button:disabled{ opacity: .45 !important; }
+    .fc .fc-daygrid-day-number{ color: var(--muted); }
+    .fc .fc-day-today{ background: rgba(94,227,143,.10) !important; }
+    .fc .fc-event{
+      font-size: 11px;
       border-radius: 8px;
-      padding: 1rem;
+      padding: 2px 6px;
+      border: 0 !important;
     }
-    .fc-event { font-size: 0.9rem; padding: 2px 4px; }
+
+    /* Settings */
+    .settings{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      align-items:end;
+    }
+    .settings .field{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+    .settings label{
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .settings .full{ grid-column: 1 / -1; }
+    .hint{
+      margin: 10px 0 0 0;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+      background: rgba(0,0,0,.16);
+      border: 1px solid rgba(255,255,255,.06);
+      padding: 10px 10px;
+      border-radius: 12px;
+    }
+    .btn-row{
+      display:flex;
+      gap:10px;
+      grid-column: 1 / -1;
+    }
+
+    /* Exercise grid */
+    .grid-head{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:10px;
+      padding: 14px 14px 10px 14px;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+    .grid-head .left{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+    .grid-actions{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .exercise-grid{
+      padding: 14px;
+      display:grid;
+      grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+      gap: 12px;
+    }
+
+    .card{
+      background: rgba(0,0,0,.14);
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: 14px;
+      padding: 12px;
+      display:flex;
+      flex-direction:column;
+      gap: 10px;
+      min-height: 240px;
+    }
+    .card-top{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .name-wrap{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      min-width: 0;
+      flex: 1;
+    }
+    .dot{
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      flex: 0 0 auto;
+      box-shadow: 0 0 0 3px rgba(255,255,255,.05);
+    }
+    .ex-name{
+      width: 100%;
+      min-width: 0;
+      font-weight: 700;
+      letter-spacing: .2px;
+      padding: 8px 10px;
+    }
+    .icon-btn{
+      padding: 8px 10px;
+      border-radius: 10px;
+      font-size: 12px;
+      line-height: 1;
+    }
+
+    .stats{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .stat{
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 12px;
+      padding: 10px;
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+    .stat .label{
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .stat .value{
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: .2px;
+    }
+    .stat.wide{ grid-column: 1 / -1; }
+    .progress{
+      height: 10px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: 999px;
+      overflow:hidden;
+    }
+    .progress .bar{
+      height:100%;
+      width:0%;
+      background: linear-gradient(90deg, rgba(94,227,143,.95), rgba(76,150,255,.85));
+    }
+    .nextline{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .entry{
+      display:grid;
+      grid-template-columns: 1fr 110px 44px;
+      gap: 10px;
+      align-items:end;
+    }
+    .entry .entry-label{
+      font-size: 12px;
+      color: var(--muted);
+      line-height:1.2;
+      padding: 6px 0;
+    }
+    .mini{
+      padding: 10px 0;
+      text-align:center;
+      font-weight:700;
+      border-radius: 10px;
+    }
+
+    .chart-wrap{
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 12px;
+      padding: 8px 10px;
+    }
+    .chart-wrap .caption{
+      font-size: 11px;
+      color: var(--muted);
+      margin: 0 0 6px 2px;
+    }
+    canvas{
+      width: 100% !important;
+      height: 90px !important;
+      display:block;
+    }
+
+    .muted{
+      color: var(--muted);
+      font-size: 12px;
+    }
   </style>
 </head>
 
 <body>
-  <header>
-    <h1>운동 게임 대시보드</h1>
-    <div class="total-info" id="total-info">총 누적: 0 reps</div>
-  </header>
+<header>
+  <div class="header-inner">
+    <div class="brand">
+      <h1>운동 대시보드 (종목별)</h1>
+      <p class="sub">날짜를 선택하고 종목별 reps를 입력하면 즉시 저장됩니다. (총합/복잡한 중복 그래프 제거)</p>
+    </div>
 
-  <main>
-    <div class="calendar-section">
+    <div class="date-controls">
+      <button id="prev-day" class="ghost">이전</button>
+      <div class="pill">
+        <strong id="selected-ymd">0000-00-00</strong>
+      </div>
+      <input id="date-picker" type="date">
+      <button id="next-day" class="ghost">다음</button>
+      <span id="save-status" class="status saved">저장됨</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- LEFT: Calendar + Level System -->
+  <section class="panel">
+    <div class="panel-head">
+      <div>
+        <p class="panel-title">캘린더</p>
+        <div class="panel-sub">기록이 있는 날짜는 “기록 n종목”으로 표시됩니다. 총합 대신 종목 수 중심입니다.</div>
+      </div>
+    </div>
+    <div class="panel-body">
       <div id="calendar"></div>
     </div>
 
-    <div class="sidebar">
-      <div class="card">
-        <h2 id="selected-date-title">날짜 선택</h2>
-        <div id="exercise-list"></div>
-        <button id="add-exercise-btn">+ 운동 추가</button>
-        <button id="save-today-btn" style="margin-top:1rem;">기록 저장</button>
-      </div>
-
-      <div class="card">
-        <h2>종목별 레벨</h2>
-        <div id="level-list" class="level-list"></div>
-        <button id="auto-quadratic-btn" style="margin-top:1rem;background:#2196F3;">
-          Quadratic 재설정 (base 200)
-        </button>
-      </div>
-
-      <div class="card">
-        <h2>종목별 누적 그래프</h2>
-        <canvas id="perExerciseChart"></canvas>
+    <div class="panel-head">
+      <div>
+        <p class="panel-title">레벨 시스템</p>
+        <div class="panel-sub">“레벨업에 필요한 reps” 규칙을 설정합니다. 기록(History)은 변경하지 않고, 레벨 계산만 바뀝니다.</div>
       </div>
     </div>
-  </main>
+    <div class="panel-body">
+      <div class="settings">
+        <div class="field">
+          <label>커브</label>
+          <select id="level-curve">
+            <option value="quadratic">Quadratic (base × n²)</option>
+            <option value="linear">Linear (base × n)</option>
+            <option value="exponential">Exponential (base × 2^(n-1))</option>
+          </select>
+        </div>
 
-  <script>
-    const defaultExercises = ["풀업", "푸쉬업", "앱슬라이드", "스쿼트", "카프레이즈"];
+        <div class="field">
+          <label>base</label>
+          <input id="level-base" type="number" min="1" step="1">
+        </div>
 
-    function escapeAttr(str) {
-      return String(str)
-        .replace(/&/g, "&amp;")
-        .replace(/"/g, "&quot;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
+        <div class="field">
+          <label>최대 레벨</label>
+          <input id="level-max" type="number" min="2" step="1">
+        </div>
+
+        <div class="btn-row">
+          <button id="apply-level" class="primary">적용</button>
+          <button id="reset-level" class="ghost">기본값</button>
+        </div>
+
+        <div class="full">
+          <p id="level-hint" class="hint"></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RIGHT: Exercise cards -->
+  <section class="panel">
+    <div class="grid-head">
+      <div class="left">
+        <p class="panel-title">종목별 현황</p>
+        <div class="panel-sub" id="grid-sub">선택 날짜: -</div>
+      </div>
+      <div class="grid-actions">
+        <button id="add-exercise" class="primary">+ 종목 추가</button>
+      </div>
+    </div>
+    <div id="exercise-grid" class="exercise-grid"></div>
+  </section>
+</div>
+
+<script>
+  /*********************
+   * Utilities: Date
+   *********************/
+  function normalizeYMD(input) {
+    if (typeof input === "string") {
+      const m = input.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+    }
+    const d = input instanceof Date ? input : new Date(input);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  function parseYMDToLocalDate(ymd) {
+    const [y, m, d] = ymd.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  }
+
+  function formatYMD(dateObj) {
+    const y = dateObj.getFullYear();
+    const m = String(dateObj.getMonth() + 1).padStart(2, "0");
+    const d = String(dateObj.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
+  function addDaysYMD(ymd, delta) {
+    const dt = parseYMDToLocalDate(ymd);
+    dt.setDate(dt.getDate() + delta);
+    return formatYMD(dt);
+  }
+
+  function lastNDates(endYMD, n) {
+    const end = parseYMDToLocalDate(endYMD);
+    const dates = [];
+    for (let i = n - 1; i >= 0; i--) {
+      const d = new Date(end);
+      d.setDate(d.getDate() - i);
+      dates.push(formatYMD(d));
+    }
+    return dates;
+  }
+
+  /*********************
+   * Utilities: ID, HTML
+   *********************/
+  function makeId() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return "id_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 10);
+  }
+
+  function escapeAttr(str) {
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  /*********************
+   * State (V2)
+   * - exercises: [{id, name, color}]
+   * - history: { 'YYYY-MM-DD': { [exerciseId]: reps } }
+   * - settings.level: curve/base/maxLevel
+   *********************/
+  const STORAGE_KEY = "fitnessGameData";
+  const DEFAULTS = {
+    version: 2,
+    exercises: [
+      { id: makeId(), name: "풀업",      color: "#5ee38f" },
+      { id: makeId(), name: "푸쉬업",    color: "#4c96ff" },
+      { id: makeId(), name: "앱슬라이드", color: "#ffb020" },
+      { id: makeId(), name: "스쿼트",    color: "#ff5a5f" },
+      { id: makeId(), name: "카프레이즈", color: "#b58cff" },
+    ],
+    history: {},
+    settings: {
+      level: { curve: "quadratic", base: 200, maxLevel: 30 },
+      chartDays: 14
+    }
+  };
+
+  const COLOR_POOL = ["#5ee38f","#4c96ff","#ffb020","#ff5a5f","#b58cff","#19d3c5","#ffd166","#8bd3ff","#fca311","#ff85a1"];
+
+  function loadState() {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return structuredClone(DEFAULTS);
+
+    let parsed;
+    try { parsed = JSON.parse(raw); }
+    catch { return structuredClone(DEFAULTS); }
+
+    // Already V2
+    if (parsed && parsed.version === 2 && Array.isArray(parsed.exercises) && parsed.history && parsed.settings) {
+      // minimal hardening
+      parsed.settings = parsed.settings || {};
+      parsed.settings.level = parsed.settings.level || { curve:"quadratic", base:200, maxLevel:30 };
+      parsed.settings.chartDays = parsed.settings.chartDays || 14;
+      return parsed;
     }
 
-    // 어떤 형태의 날짜 입력이 와도 YYYY-MM-DD로 강제
-    function normalizeYMD(input) {
-      if (typeof input === "string") {
-        const m = input.match(/^(\d{4})-(\d{2})-(\d{2})/);
-        if (m) return `${m[1]}-${m[2]}-${m[3]}`;
-      }
-      const d = (input instanceof Date) ? input : new Date(input);
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth() + 1).padStart(2, "0");
-      const dd = String(d.getDate()).padStart(2, "0");
-      return `${yyyy}-${mm}-${dd}`;
+    // Migration from older formats (v1: exercises: [{name}], history: {date: {name: reps}})
+    const migrated = structuredClone(DEFAULTS);
+    migrated.exercises = [];
+    migrated.history = {};
+    migrated.settings.level = { curve: "quadratic", base: 200, maxLevel: 30 };
+
+    const nameToId = new Map();
+
+    // exercises list
+    const v1Exercises = Array.isArray(parsed?.exercises) ? parsed.exercises : [];
+    for (let i = 0; i < v1Exercises.length; i++) {
+      const nm = (v1Exercises[i]?.name || "").trim();
+      if (!nm) continue;
+      if (nameToId.has(nm)) continue;
+      const id = makeId();
+      nameToId.set(nm, id);
+      migrated.exercises.push({ id, name: nm, color: COLOR_POOL[migrated.exercises.length % COLOR_POOL.length] });
     }
 
-    function getLocalTodayYMD() {
-      return normalizeYMD(new Date());
-    }
+    // history
+    const v1History = parsed?.history && typeof parsed.history === "object" ? parsed.history : {};
+    for (const dateKey in v1History) {
+      const ymd = normalizeYMD(dateKey);
+      const day = v1History[dateKey] || {};
+      if (!migrated.history[ymd]) migrated.history[ymd] = {};
 
-    let data = {
-      exercises: defaultExercises.map(name => ({ name })),
-      history: {},
-      levelReqs: []
-    };
+      for (const exName in day) {
+        const reps = Number(day[exName]) || 0;
+        if (reps <= 0) continue;
 
-    function generateQuadratic(base = 200, maxLevel = 20) {
-      const reqs = [];
-      for (let n = 1; n < maxLevel; n++) {
-        reqs.push({ toLevel: n + 1, requiredReps: base * n * n });
-      }
-      return reqs;
-    }
-
-    function saveData() {
-      localStorage.setItem("fitnessGameData", JSON.stringify(data));
-    }
-
-    function loadData() {
-      const raw = localStorage.getItem("fitnessGameData");
-      if (!raw) return;
-
-      const loaded = JSON.parse(raw);
-      data = {
-        exercises: loaded.exercises || defaultExercises.map(name => ({ name })),
-        history: loaded.history || {},
-        levelReqs: Array.isArray(loaded.levelReqs) ? loaded.levelReqs : []
-      };
-    }
-
-    // 과거 버전에서 날짜 키가 YYYY-MM-DD가 아닐 수도 있으니 일괄 정규화(중복 키는 exercise별로 큰 값 우선)
-    function normalizeHistoryKeysInPlace() {
-      const newHistory = {};
-
-      for (const key in data.history) {
-        const norm = normalizeYMD(key);
-        const day = data.history[key] || {};
-
-        if (!newHistory[norm]) newHistory[norm] = {};
-
-        for (const exName in day) {
-          const v = Number(day[exName]) || 0;
-          if (v <= 0) continue;
-
-          // 중복이 있으면 max로 (합산으로 인한 중복 카운트 방지)
-          newHistory[norm][exName] = Math.max(newHistory[norm][exName] || 0, v);
+        let id = nameToId.get(exName);
+        if (!id) {
+          // unknown exercise name appeared in history -> create it
+          id = makeId();
+          nameToId.set(exName, id);
+          migrated.exercises.push({ id, name: exName, color: COLOR_POOL[migrated.exercises.length % COLOR_POOL.length] });
         }
+        migrated.history[ymd][id] = Math.max(migrated.history[ymd][id] || 0, reps);
       }
 
-      data.history = newHistory;
+      if (Object.keys(migrated.history[ymd]).length === 0) delete migrated.history[ymd];
     }
 
-    // 초기 로드
-    loadData();
+    return migrated;
+  }
 
-    if (!Array.isArray(data.levelReqs) || data.levelReqs.length === 0) {
-      data.levelReqs = generateQuadratic(200, 21);
+  function saveState() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  let state = loadState();
+
+  /*********************
+   * Level logic
+   *********************/
+  function reqForTransition(n) {
+    const { curve, base } = state.settings.level;
+    const b = Math.max(1, Number(base) || 1);
+
+    if (curve === "linear") return Math.round(b * n);
+    if (curve === "exponential") return Math.round(b * Math.pow(2, n - 1));
+    // quadratic (default)
+    return Math.round(b * n * n);
+  }
+
+  function getCumulativeById(exId) {
+    let sum = 0;
+    for (const date in state.history) {
+      sum += Number(state.history[date]?.[exId] || 0);
     }
+    return sum;
+  }
 
-    normalizeHistoryKeysInPlace();
-    saveData();
+  function getLevelMeta(exId) {
+    const cum = getCumulativeById(exId);
+    const maxL = Math.max(2, Number(state.settings.level.maxLevel) || 30);
 
-    function getTotalReps() {
-      let total = 0;
-      for (const date in data.history) {
-        const day = data.history[date] || {};
-        for (const ex in day) total += (Number(day[ex]) || 0);
-      }
-      return total;
-    }
+    let threshold = 0;
 
-    function getExerciseCumulative(exName) {
-      let cum = 0;
-      for (const date in data.history) {
-        cum += (Number(data.history[date]?.[exName]) || 0);
-      }
-      return cum;
-    }
+    for (let n = 1; n < maxL; n++) {
+      const need = reqForTransition(n);
+      const nextThreshold = threshold + need;
 
-    function getLevelForExercise(exName) {
-      const cum = getExerciseCumulative(exName);
-      let level = 1;
-      let cumulative = 0;
-
-      for (const req of data.levelReqs) {
-        if (cumulative + req.requiredReps > cum) break;
-        cumulative += req.requiredReps;
-        level = req.toLevel;
-      }
-      return level;
-    }
-
-    function updateTotalInfo() {
-      document.getElementById("total-info").textContent = `총 누적: ${getTotalReps()} reps`;
-    }
-
-    function updateLevelList() {
-      const list = document.getElementById("level-list");
-      list.innerHTML = "";
-      data.exercises.forEach(ex => {
-        const level = getLevelForExercise(ex.name);
-        const div = document.createElement("div");
-        div.className = "level-item";
-        div.textContent = `${ex.name}: 레벨 ${level}`;
-        list.appendChild(div);
-      });
-    }
-
-    let selectedDate = getLocalTodayYMD();
-    let calendar;
-
-    function getCalendarEventsArray() {
-      const events = [];
-      for (const dateKey in data.history) {
-        const date = normalizeYMD(dateKey);
-        const day = data.history[dateKey] || {};
-
-        let total = 0;
-        const details = [];
-
-        for (const ex in day) {
-          const reps = Number(day[ex]) || 0;
-          total += reps;
-          details.push(`${ex}: ${reps}`);
-        }
-
-        if (total > 0) {
-          events.push({
-            title: `총 ${total} reps`,
-            start: date, // 반드시 YYYY-MM-DD
-            allDay: true,
-            tooltip: details.join('\n'),
-            backgroundColor: '#4CAF50',
-            borderColor: '#4CAF50'
-          });
-        }
-      }
-      return events;
-    }
-
-    function initCalendar() {
-      calendar = new FullCalendar.Calendar(document.getElementById("calendar"), {
-        initialView: "dayGridMonth",
-        headerToolbar: { left: "prev,next today", center: "title", right: "dayGridMonth,timeGridWeek" },
-
-        // 핵심: events를 "함수형 소스"로 제공 -> 데이터 변경 후 refetchEvents()로 항상 최신 반영
-        events: function(fetchInfo, successCallback) {
-          successCallback(getCalendarEventsArray());
-        },
-
-        dateClick: function(info) {
-          selectedDate = normalizeYMD(info.dateStr);
-          document.getElementById("selected-date-title").textContent = `${selectedDate} 기록`;
-          loadExercisesForDate(selectedDate);
-        },
-
-        eventClick: function(info) {
-          // startStr이 YYYY-MM-DD 형태로 가장 안전
-          selectedDate = normalizeYMD(info.event.startStr || info.event.start);
-          document.getElementById("selected-date-title").textContent = `${selectedDate} 기록`;
-          loadExercisesForDate(selectedDate);
-        },
-
-        eventDidMount: function(info) {
-          info.el.title = info.event.extendedProps.tooltip;
-        }
-      });
-
-      calendar.render();
-    }
-
-    function loadExercisesForDate(date) {
-      const ymd = normalizeYMD(date);
-      const list = document.getElementById("exercise-list");
-      list.innerHTML = "";
-
-      data.exercises.forEach((ex, i) => {
-        const saved = Number(data.history[ymd]?.[ex.name]) || 0;
-
-        const div = document.createElement("div");
-        div.className = "exercise-item";
-        div.innerHTML = `
-          <input type="text" value="${escapeAttr(ex.name)}" data-index="${i}" class="ex-name">
-          <input type="number" min="0" value="${saved}" data-index="${i}" class="ex-reps">
-          <button class="danger remove-ex" data-index="${i}">삭제</button>
-        `;
-        list.appendChild(div);
-      });
-    }
-
-    function addExercise() {
-      data.exercises.push({ name: "새 운동" });
-      saveData();
-      loadExercisesForDate(selectedDate);
-      updateAll();
-    }
-
-    function removeExercise(i) {
-      const idx = Number(i);
-      if (!Number.isFinite(idx) || idx < 0 || idx >= data.exercises.length) return;
-
-      const name = data.exercises[idx].name;
-      data.exercises.splice(idx, 1);
-
-      for (const date in data.history) {
-        if (data.history[date] && data.history[date][name] !== undefined) {
-          delete data.history[date][name];
-          if (Object.keys(data.history[date]).length === 0) delete data.history[date];
-        }
-      }
-
-      saveData();
-      loadExercisesForDate(selectedDate);
-      updateAll();
-    }
-
-    function saveToday() {
-      const date = normalizeYMD(selectedDate);
-      selectedDate = date;
-
-      if (!data.history[date]) data.history[date] = {};
-
-      let daily = 0;
-
-      document.querySelectorAll(".ex-reps").forEach(inp => {
-        const idx = Number(inp.dataset.index);
-        if (!Number.isFinite(idx) || idx < 0 || idx >= data.exercises.length) return;
-
-        const name = data.exercises[idx].name;
-        const reps = Number(inp.value) || 0;
-
-        if (reps > 0) {
-          data.history[date][name] = reps;
-          daily += reps;
-        } else {
-          delete data.history[date][name];
-        }
-      });
-
-      if (Object.keys(data.history[date]).length === 0) {
-        delete data.history[date];
-      }
-
-      saveData();
-      // 저장 직후 폼을 다시 로드해서 “저장된 값 기준”으로 확정 표시
-      loadExercisesForDate(selectedDate);
-      updateAll();
-
-      alert(`${date} 기록 저장! (+${daily} reps)`);
-    }
-
-    let perChart;
-
-    function updatePerExerciseChart() {
-      // 날짜 키를 정규화한 리스트로 만든다
-      const rawKeys = Object.keys(data.history);
-      const dates = rawKeys.map(k => normalizeYMD(k)).sort();
-
-      // 중복 날짜가 생길 수 있으니 unique
-      const uniqDates = [...new Set(dates)];
-
-      const canvas = document.getElementById("perExerciseChart");
-      const existing = Chart.getChart(canvas);
-      if (existing) existing.destroy();
-
-      const datasets = data.exercises.map((ex, i) => {
-        const color = ["#4CAF50","#2196F3","#FF9800","#F44336","#9C27B0","#00BCD4","#FFEB3B","#795548"][i % 8];
-
-        let running = 0;
-        const cumData = uniqDates.map(date => {
-          // date는 정규화되어 있으므로 그대로 접근
-          running += (Number(data.history[date]?.[ex.name]) || 0);
-          return running;
-        });
-
+      if (cum < nextThreshold) {
+        const into = cum - threshold;
+        const remaining = nextThreshold - cum;
+        const progress = need > 0 ? (into / need) : 0;
         return {
-          label: `${ex.name} (레벨 ${getLevelForExercise(ex.name)})`,
-          data: cumData,
-          borderColor: color,
-          backgroundColor: color + "33",
-          tension: 0.3,
-          fill: true
+          level: n,
+          cum,
+          need,
+          remaining,
+          progress: Math.max(0, Math.min(1, progress)),
+          nextLevel: n + 1
         };
+      }
+      threshold = nextThreshold;
+    }
+
+    // max level reached
+    return {
+      level: maxL,
+      cum,
+      need: 0,
+      remaining: 0,
+      progress: 1,
+      nextLevel: null
+    };
+  }
+
+  function levelHintText() {
+    const { curve, base, maxLevel } = state.settings.level;
+    const b = Math.max(1, Number(base) || 1);
+    const maxL = Math.max(2, Number(maxLevel) || 30);
+
+    if (curve === "linear") {
+      return `Linear: 레벨 n → n+1 에 필요한 reps = base × n 입니다. (base=${b}) 예: 1→2는 ${b}, 2→3은 ${2*b}, ... 최대 레벨 ${maxL}.`;
+    }
+    if (curve === "exponential") {
+      return `Exponential: 레벨 n → n+1 에 필요한 reps = base × 2^(n-1) 입니다. (base=${b}) 예: 1→2는 ${b}, 2→3은 ${2*b}, 3→4는 ${4*b}, ... 최대 레벨 ${maxL}.`;
+    }
+    return `Quadratic: 레벨 n → n+1 에 필요한 reps = base × n² 입니다. (base=${b}) 예: 1→2는 ${b}, 2→3은 ${4*b}, 3→4는 ${9*b}, ... 최대 레벨 ${maxL}.`;
+  }
+
+  /*********************
+   * Calendar
+   *********************/
+  let calendar = null;
+  let selectedDate = normalizeYMD(new Date());
+  const saveStatusEl = document.getElementById("save-status");
+
+  function buildCalendarEvents() {
+    const events = [];
+    for (const date in state.history) {
+      const day = state.history[date] || {};
+      const ids = Object.keys(day).filter(id => Number(day[id]) > 0);
+      const count = ids.length;
+      if (count <= 0) continue;
+
+      const lines = ids.map(id => {
+        const ex = state.exercises.find(e => e.id === id);
+        const nm = ex ? ex.name : "(알 수 없음)";
+        return `${nm}: ${day[id]}`;
       });
 
-      perChart = new Chart(canvas, {
-        type: "line",
-        data: { labels: uniqDates, datasets },
-        options: {
-          scales: {
-            x: { type: "category" },
-            y: { beginAtZero: true }
+      events.push({
+        title: `기록 ${count}종목`,
+        start: date,
+        allDay: true,
+        tooltip: lines.join("\n"),
+        backgroundColor: "rgba(94,227,143,.85)",
+        borderColor: "rgba(94,227,143,.0)"
+      });
+    }
+    return events;
+  }
+
+  function initCalendar() {
+    calendar = new FullCalendar.Calendar(document.getElementById("calendar"), {
+      initialView: "dayGridMonth",
+      height: "auto",
+      headerToolbar: { left: "prev,next today", center: "title", right: "dayGridMonth,timeGridWeek" },
+
+      events: function(fetchInfo, success) {
+        success(buildCalendarEvents());
+      },
+
+      dateClick: function(info) {
+        setSelectedDate(normalizeYMD(info.dateStr), true);
+      },
+
+      eventClick: function(info) {
+        setSelectedDate(normalizeYMD(info.event.startStr || info.event.start), true);
+      },
+
+      eventDidMount: function(info) {
+        info.el.title = info.event.extendedProps.tooltip || "";
+      }
+    });
+
+    calendar.render();
+  }
+
+  /*********************
+   * Charts per exercise
+   *********************/
+  const charts = new Map(); // exId -> Chart instance
+
+  function getDailyReps(exId, dateYMD) {
+    return Number(state.history[dateYMD]?.[exId] || 0);
+  }
+
+  function ensureChart(exId, canvas, color) {
+    const existing = Chart.getChart(canvas);
+    if (existing) existing.destroy();
+
+    const chart = new Chart(canvas, {
+      type: "bar",
+      data: {
+        labels: [],
+        datasets: [{
+          label: "Daily reps",
+          data: [],
+          backgroundColor: color + "55",
+          borderColor: color,
+          borderWidth: 1,
+          borderRadius: 8
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title: (items) => items?.[0]?.label || "",
+              label: (item) => `reps: ${item.raw}`
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { color: "rgba(169,182,201,.9)", maxRotation: 0, autoSkip: true }
           },
-          plugins: { legend: { position: "bottom" } }
-        }
-      });
-    }
-
-    function updateAll() {
-      updateTotalInfo();
-      updateLevelList();
-      updatePerExerciseChart();
-
-      if (calendar) {
-        // 핵심: 함수형 events 소스이므로 refetchEvents()만 하면 최신 반영
-        calendar.refetchEvents();
-      }
-    }
-
-    // Listeners
-    document.getElementById("add-exercise-btn").addEventListener("click", addExercise);
-    document.getElementById("save-today-btn").addEventListener("click", saveToday);
-
-    document.getElementById("auto-quadratic-btn").addEventListener("click", () => {
-      data.levelReqs = generateQuadratic(200, 21);
-      saveData();
-      updateAll();
-    });
-
-    document.getElementById("exercise-list").addEventListener("change", e => {
-      if (!e.target.classList.contains("ex-name")) return;
-
-      const idx = Number(e.target.dataset.index);
-      if (!Number.isFinite(idx) || idx < 0 || idx >= data.exercises.length) return;
-
-      const oldName = data.exercises[idx].name;
-      const newName = (e.target.value || "").trim() || "새 운동";
-      if (oldName === newName) return;
-
-      data.exercises[idx].name = newName;
-
-      // history 키 마이그레이션 (중복 시 max)
-      for (const date in data.history) {
-        const day = data.history[date];
-        if (!day) continue;
-
-        if (day[oldName] !== undefined) {
-          day[newName] = Math.max(Number(day[newName]) || 0, Number(day[oldName]) || 0);
-          delete day[oldName];
+          y: {
+            beginAtZero: true,
+            grid: { color: "rgba(255,255,255,.06)" },
+            ticks: { color: "rgba(169,182,201,.9)", precision: 0 }
+          }
         }
       }
-
-      saveData();
-      loadExercisesForDate(selectedDate);
-      updateAll();
     });
 
-    document.getElementById("exercise-list").addEventListener("click", e => {
-      if (e.target.classList.contains("remove-ex")) {
-        removeExercise(e.target.dataset.index);
+    charts.set(exId, chart);
+    return chart;
+  }
+
+  function updateChartForExercise(ex) {
+    const exId = ex.id;
+    const days = Math.max(7, Number(state.settings.chartDays) || 14);
+    const labels = lastNDates(selectedDate, days);
+    const values = labels.map(d => getDailyReps(exId, d));
+
+    const canvas = document.querySelector(`canvas[data-exid="${exId}"]`);
+    if (!canvas) return;
+
+    let chart = charts.get(exId);
+    if (!chart) chart = ensureChart(exId, canvas, ex.color);
+
+    chart.data.labels = labels;
+    chart.data.datasets[0].data = values;
+    chart.update("none");
+  }
+
+  /*********************
+   * Rendering
+   *********************/
+  function renderExerciseGrid() {
+    const grid = document.getElementById("exercise-grid");
+    grid.innerHTML = "";
+
+    state.exercises.forEach((ex) => {
+      const meta = getLevelMeta(ex.id);
+      const dayReps = getDailyReps(ex.id, selectedDate);
+
+      const card = document.createElement("div");
+      card.className = "card";
+      card.dataset.exid = ex.id;
+
+      card.innerHTML = `
+        <div class="card-top">
+          <div class="name-wrap">
+            <span class="dot" style="background:${escapeAttr(ex.color)}"></span>
+            <input class="ex-name" data-exid="${escapeAttr(ex.id)}" type="text" value="${escapeAttr(ex.name)}" />
+          </div>
+          <button class="icon-btn danger" data-action="delete" data-exid="${escapeAttr(ex.id)}" title="종목 삭제">삭제</button>
+        </div>
+
+        <div class="stats">
+          <div class="stat">
+            <div class="label">누적</div>
+            <div class="value" data-field="cum" data-exid="${escapeAttr(ex.id)}">${meta.cum.toLocaleString()}</div>
+          </div>
+          <div class="stat">
+            <div class="label">레벨</div>
+            <div class="value" data-field="level" data-exid="${escapeAttr(ex.id)}">${meta.level}</div>
+          </div>
+
+          <div class="stat wide">
+            <div class="nextline">
+              <span>다음 레벨</span>
+              <span data-field="next" data-exid="${escapeAttr(ex.id)}">${
+                meta.nextLevel ? (`Lv.${meta.nextLevel}까지 ${meta.remaining.toLocaleString()} reps`) : "최대 레벨"
+              }</span>
+            </div>
+            <div class="progress" title="현재 레벨 진행도">
+              <div class="bar" data-field="bar" data-exid="${escapeAttr(ex.id)}" style="width:${Math.round(meta.progress*100)}%"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="entry">
+          <div class="entry-label">선택 날짜 reps</div>
+          <input class="reps-input" data-exid="${escapeAttr(ex.id)}" type="number" min="0" step="1" value="${dayReps}">
+          <button class="mini ghost" data-action="zero" data-exid="${escapeAttr(ex.id)}">0</button>
+        </div>
+
+        <div class="chart-wrap">
+          <p class="caption">최근 ${Math.max(7, Number(state.settings.chartDays)||14)}일 (선택 날짜 기준)</p>
+          <canvas data-exid="${escapeAttr(ex.id)}"></canvas>
+        </div>
+
+        <div class="muted">Tip: 종목명은 바로 수정 가능합니다. 기록은 즉시 저장됩니다.</div>
+      `;
+
+      grid.appendChild(card);
+    });
+
+    // After DOM exists, create/update charts
+    state.exercises.forEach(ex => updateChartForExercise(ex));
+  }
+
+  function updateSingleCard(exId) {
+    const ex = state.exercises.find(e => e.id === exId);
+    if (!ex) return;
+
+    const meta = getLevelMeta(ex.id);
+    const cumEl = document.querySelector(`[data-field="cum"][data-exid="${CSS.escape(ex.id)}"]`);
+    const levelEl = document.querySelector(`[data-field="level"][data-exid="${CSS.escape(ex.id)}"]`);
+    const nextEl = document.querySelector(`[data-field="next"][data-exid="${CSS.escape(ex.id)}"]`);
+    const barEl = document.querySelector(`[data-field="bar"][data-exid="${CSS.escape(ex.id)}"]`);
+    const inputEl = document.querySelector(`.reps-input[data-exid="${CSS.escape(ex.id)}"]`);
+
+    if (cumEl) cumEl.textContent = meta.cum.toLocaleString();
+    if (levelEl) levelEl.textContent = meta.level;
+    if (nextEl) nextEl.textContent = meta.nextLevel ? `Lv.${meta.nextLevel}까지 ${meta.remaining.toLocaleString()} reps` : "최대 레벨";
+    if (barEl) barEl.style.width = `${Math.round(meta.progress * 100)}%`;
+    if (inputEl) inputEl.value = getDailyReps(ex.id, selectedDate);
+
+    updateChartForExercise(ex);
+  }
+
+  function updateAllCards() {
+    state.exercises.forEach(ex => updateSingleCard(ex.id));
+  }
+
+  function updateHeaderAndSub() {
+    document.getElementById("selected-ymd").textContent = selectedDate;
+    document.getElementById("date-picker").value = selectedDate;
+    document.getElementById("grid-sub").textContent = `선택 날짜: ${selectedDate} (입력 즉시 저장)`;
+  }
+
+  function setSelectedDate(ymd, gotoCalendar) {
+    selectedDate = normalizeYMD(ymd);
+    updateHeaderAndSub();
+
+    if (calendar && gotoCalendar) {
+      calendar.gotoDate(selectedDate);
+    }
+
+    // 입력값과 차트 기준이 바뀌므로 업데이트
+    updateAllCards();
+  }
+
+  /*********************
+   * Saving indicator
+   *********************/
+  let saveTimer = null;
+  function markSaving() {
+    saveStatusEl.textContent = "저장 중...";
+    saveStatusEl.classList.remove("saved");
+    saveStatusEl.classList.add("saving");
+  }
+  function markSaved() {
+    saveStatusEl.textContent = "저장됨";
+    saveStatusEl.classList.remove("saving");
+    saveStatusEl.classList.add("saved");
+  }
+  function saveWithIndicator() {
+    markSaving();
+    clearTimeout(saveTimer);
+    // localStorage는 즉시지만, UX 상 짧게 "saving" 상태를 보여줌
+    saveState();
+    saveTimer = setTimeout(() => markSaved(), 150);
+  }
+
+  /*********************
+   * History operations
+   *********************/
+  function setReps(exId, ymd, reps) {
+    const date = normalizeYMD(ymd);
+    const v = Math.max(0, Number(reps) || 0);
+
+    if (v <= 0) {
+      if (state.history[date] && state.history[date][exId] !== undefined) {
+        delete state.history[date][exId];
+        if (Object.keys(state.history[date]).length === 0) delete state.history[date];
       }
-    });
+      return;
+    }
 
-    // Init
-    document.addEventListener("DOMContentLoaded", () => {
-      selectedDate = getLocalTodayYMD();
-      document.getElementById("selected-date-title").textContent = `${selectedDate} 기록`;
+    if (!state.history[date]) state.history[date] = {};
+    state.history[date][exId] = v;
+  }
 
-      initCalendar();
-      loadExercisesForDate(selectedDate);
-      updateAll();
-    });
-  </script>
+  function deleteExercise(exId) {
+    state.exercises = state.exercises.filter(e => e.id !== exId);
+    // remove from history
+    for (const date in state.history) {
+      if (state.history[date] && state.history[date][exId] !== undefined) {
+        delete state.history[date][exId];
+        if (Object.keys(state.history[date]).length === 0) delete state.history[date];
+      }
+    }
+    // chart cleanup
+    const ch = charts.get(exId);
+    if (ch) ch.destroy();
+    charts.delete(exId);
+  }
+
+  /*********************
+   * Level settings UI
+   *********************/
+  function syncLevelInputs() {
+    document.getElementById("level-curve").value = state.settings.level.curve;
+    document.getElementById("level-base").value = state.settings.level.base;
+    document.getElementById("level-max").value = state.settings.level.maxLevel;
+    document.getElementById("level-hint").textContent = levelHintText();
+  }
+
+  function applyLevelSettingsFromInputs() {
+    const curve = document.getElementById("level-curve").value;
+    const base = Math.max(1, Number(document.getElementById("level-base").value) || 1);
+    const maxLevel = Math.max(2, Number(document.getElementById("level-max").value) || 2);
+
+    state.settings.level = { curve, base, maxLevel };
+    document.getElementById("level-hint").textContent = levelHintText();
+
+    saveWithIndicator();
+    updateAllCards();
+  }
+
+  function resetLevelSettings() {
+    state.settings.level = { curve: "quadratic", base: 200, maxLevel: 30 };
+    syncLevelInputs();
+    saveWithIndicator();
+    updateAllCards();
+  }
+
+  /*********************
+   * Events: inputs & buttons
+   *********************/
+  document.getElementById("prev-day").addEventListener("click", () => {
+    setSelectedDate(addDaysYMD(selectedDate, -1), true);
+  });
+  document.getElementById("next-day").addEventListener("click", () => {
+    setSelectedDate(addDaysYMD(selectedDate, +1), true);
+  });
+  document.getElementById("date-picker").addEventListener("change", (e) => {
+    const ymd = normalizeYMD(e.target.value);
+    setSelectedDate(ymd, true);
+  });
+
+  document.getElementById("apply-level").addEventListener("click", applyLevelSettingsFromInputs);
+  document.getElementById("reset-level").addEventListener("click", resetLevelSettings);
+
+  document.getElementById("level-curve").addEventListener("change", () => {
+    document.getElementById("level-hint").textContent = levelHintText();
+  });
+  document.getElementById("level-base").addEventListener("input", () => {
+    document.getElementById("level-hint").textContent = levelHintText();
+  });
+  document.getElementById("level-max").addEventListener("input", () => {
+    document.getElementById("level-hint").textContent = levelHintText();
+  });
+
+  document.getElementById("add-exercise").addEventListener("click", () => {
+    const name = (prompt("새 종목 이름을 입력하세요 (예: 딥스, 런지 등)", "새 종목") || "").trim();
+    if (!name) return;
+
+    const id = makeId();
+    const usedColors = new Set(state.exercises.map(e => e.color));
+    const color = COLOR_POOL.find(c => !usedColors.has(c)) || COLOR_POOL[state.exercises.length % COLOR_POOL.length];
+
+    state.exercises.push({ id, name, color });
+    saveWithIndicator();
+    renderExerciseGrid();
+    if (calendar) calendar.refetchEvents();
+  });
+
+  // Delegated events for exercise grid
+  document.getElementById("exercise-grid").addEventListener("input", (e) => {
+    const t = e.target;
+
+    // reps input: auto-save + update card + calendar
+    if (t.classList.contains("reps-input")) {
+      const exId = t.dataset.exid;
+      const reps = Number(t.value) || 0;
+      setReps(exId, selectedDate, reps);
+      saveWithIndicator();
+      updateSingleCard(exId);
+      if (calendar) calendar.refetchEvents();
+      return;
+    }
+
+    // rename: exercise name
+    if (t.classList.contains("ex-name")) {
+      const exId = t.dataset.exid;
+      const ex = state.exercises.find(x => x.id === exId);
+      if (!ex) return;
+      ex.name = (t.value || "").trim() || "이름 없음";
+      saveWithIndicator();
+      // calendar tooltip/labels depend on name, so refetch
+      if (calendar) calendar.refetchEvents();
+      return;
+    }
+  });
+
+  document.getElementById("exercise-grid").addEventListener("click", (e) => {
+    const btn = e.target.closest("button");
+    if (!btn) return;
+
+    const action = btn.dataset.action;
+    const exId = btn.dataset.exid;
+    if (!exId) return;
+
+    if (action === "zero") {
+      setReps(exId, selectedDate, 0);
+      saveWithIndicator();
+      updateSingleCard(exId);
+      if (calendar) calendar.refetchEvents();
+      return;
+    }
+
+    // delete button uses data-action="delete" or class "danger" with action not set
+    if (action === "delete" || btn.getAttribute("title") === "종목 삭제" || btn.classList.contains("danger")) {
+      const ex = state.exercises.find(x => x.id === exId);
+      const nm = ex ? ex.name : "해당 종목";
+      const ok = confirm(`"${nm}" 종목을 삭제할까요?\n이 종목의 모든 날짜 기록도 함께 삭제됩니다.`);
+      if (!ok) return;
+
+      deleteExercise(exId);
+      saveWithIndicator();
+      renderExerciseGrid();
+      if (calendar) calendar.refetchEvents();
+      return;
+    }
+  });
+
+  /*********************
+   * Init
+   *********************/
+  document.addEventListener("DOMContentLoaded", () => {
+    // Ensure selectedDate is valid
+    selectedDate = normalizeYMD(new Date());
+    updateHeaderAndSub();
+
+    // Level UI
+    syncLevelInputs();
+
+    // Calendar
+    initCalendar();
+
+    // Grid
+    renderExerciseGrid();
+
+    // First refetch to reflect migrated state
+    if (calendar) calendar.refetchEvents();
+  });
+</script>
 </body>
 </html>
