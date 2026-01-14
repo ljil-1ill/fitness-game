@@ -4,9 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>운동 게임 대시보드</title>
+  <!-- FullCalendar CDN -->
+  <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css' rel='stylesheet' />
+  <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
+  <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.3.1"></script>
+
   <style>
     :root {
       --primary: #4CAF50;
@@ -16,116 +19,69 @@
       --text: #eee;
     }
     body { font-family: 'Segoe UI', sans-serif; background: var(--darker); color: var(--text); margin:0; padding:0; min-height: 100vh; display: flex; flex-direction: column; }
-    header { background: linear-gradient(135deg, var(--primary), #2e7d32); padding: 2rem 1rem; text-align: center; }
-    h1 { margin:0; font-size: 2.2rem; }
-    .level-info { display: flex; flex-direction: column; align-items: center; margin: 1.5rem 0; }
-    .level-display { font-size: 3.5rem; margin: 0.5rem 0; font-weight: bold; }
-    .progress-container { width: 180px; height: 180px; margin: 0 auto; position: relative; }
-    .progress-circle { fill: none; stroke: #333; stroke-width: 14; }
-    .progress-fill { fill: none; stroke: var(--primary); stroke-width: 14; stroke-linecap: round; transition: stroke-dashoffset 0.8s ease; }
-    .progress-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.6rem; font-weight: bold; }
-    .total-reps { font-size: 1.2rem; margin-top: 0.5rem; }
-    main { flex: 1; max-width: 1000px; margin: 0 auto; padding: 1rem; width: 100%; box-sizing: border-box; }
-    .tabs { display: flex; justify-content: center; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
-    .tab { padding: 0.8rem 1.8rem; background: #333; border-radius: 8px 8px 0 0; cursor: pointer; transition: background 0.3s; }
-    .tab.active { background: var(--primary); }
-    .tab-content { display: none; background: var(--dark); padding: 1.5rem; border-radius: 0 8px 8px 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.6); }
-    .tab-content.active { display: block; }
-    #today { display: flex; flex-direction: column; }
-    #record-date { width: 100%; max-width: 300px; margin: 0 auto 1.5rem; font-size: 1.2rem; }
-    #exercise-list { flex: 1; margin-bottom: 1rem; }
-    .exercise-item { display: grid; grid-template-columns: 2fr 1fr 60px; gap: 1rem; align-items: center; padding: 1rem; background: #2a2a2a; border-radius: 8px; margin-bottom: 1rem; }
-    .exercise-item input[type="text"] { background: transparent; border: none; color: var(--text); font-size: 1.2rem; }
+    header { background: linear-gradient(135deg, var(--primary), #2e7d32); padding: 1.5rem 1rem; text-align: center; }
+    h1 { margin:0; font-size: 2rem; }
+    .total-info { font-size: 1.2rem; margin-top: 0.5rem; }
+    main { flex: 1; max-width: 1200px; margin: 0 auto; padding: 1rem; width: 100%; box-sizing: border-box; display: grid; grid-template-columns: 1fr; gap: 1rem; }
+    @media (min-width: 900px) { main { grid-template-columns: 1fr 400px; } }
+    .calendar-section { background: var(--dark); padding: 1rem; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.6); }
+    #calendar { max-width: 100%; background: #222; padding: 1rem; border-radius: 8px; }
+    .sidebar { display: flex; flex-direction: column; gap: 1rem; }
+    .card { background: var(--dark); padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.6); }
+    .exercise-item { display: grid; grid-template-columns: 2fr 1fr 60px; gap: 1rem; align-items: center; padding: 0.8rem; background: #2a2a2a; border-radius: 8px; margin-bottom: 0.8rem; }
+    .exercise-item input[type="text"] { background: transparent; border: none; color: var(--text); font-size: 1.1rem; }
     .exercise-item input[type="number"] { background: #444; border: none; color: var(--text); padding: 0.6rem; border-radius: 4px; text-align: center; }
-    button { background: var(--primary); border: none; color: white; padding: 0.8rem 1.2rem; border-radius: 6px; cursor: pointer; transition: 0.3s; font-size: 1rem; }
+    button { background: var(--primary); border: none; color: white; padding: 0.8rem 1.2rem; border-radius: 6px; cursor: pointer; transition: 0.3s; }
     button:hover { background: #66bb6a; }
     button.danger { background: var(--accent); }
     button.danger:hover { background: #f44336; }
-    .fixed-bottom { position: sticky; bottom: 1rem; display: flex; gap: 1rem; justify-content: center; margin-top: auto; }
-    .rewards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1.5rem; margin-top: 2rem; }
-    .reward { text-align: center; padding: 1.5rem; background: #2a2a2a; border-radius: 12px; transition: all 0.4s; opacity: 0.5; }
-    .reward.unlocked { opacity: 1; border: 3px solid var(--primary); transform: scale(1.05); box-shadow: 0 0 20px rgba(76,175,80,0.5); }
-    .reward-icon { font-size: 4rem; margin-bottom: 0.5rem; }
-    .level-up { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); display: none; align-items: center; justify-content: center; flex-direction: column; z-index: 100; }
-    .level-up.show { display: flex; animation: fadeIn 0.5s; }
-    .level-up h2 { font-size: 5rem; color: var(--primary); animation: bounce 1s infinite; }
-    @keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-30px); } }
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-    canvas { max-width: 100%; height: auto !important; }
+    .level-list { margin-top: 1rem; }
+    .level-item { padding: 0.5rem; background: #2a2a2a; border-radius: 6px; margin-bottom: 0.5rem; font-size: 1.1rem; }
+    canvas { max-width: 100%; background: #222; border-radius: 8px; padding: 1rem; }
+    .fc-event { font-size: 0.9rem; padding: 2px 4px; }
   </style>
 </head>
 <body>
   <header>
     <h1>운동 게임 대시보드</h1>
-    <div class="level-info">
-      <div class="level-display">레벨 <span id="current-level">1</span></div>
-      <div class="progress-container">
-        <svg viewBox="0 0 200 200">
-          <circle class="progress-circle" cx="100" cy="100" r="90"/>
-          <circle class="progress-fill" cx="100" cy="100" r="90" stroke-dasharray="565" stroke-dashoffset="565" transform="rotate(-90 100 100)"/>
-        </svg>
-        <div class="progress-text"><span id="progress-text">0 reps 남음</span></div>
-      </div>
-      <div class="total-reps" id="total-reps">총 누적: 0 reps</div>
-    </div>
+    <div class="total-info" id="total-info">총 누적: 0 reps</div>
   </header>
 
   <main>
-    <div class="tabs">
-      <div class="tab active" data-tab="today">기록 입력</div>
-      <div class="tab" data-tab="chart">히스토리 차트</div>
-      <div class="tab" data-tab="settings">설정</div>
+    <div class="calendar-section">
+      <div id="calendar"></div>
     </div>
 
-    <div id="today" class="tab-content active">
-      <input type="date" id="record-date"/>
-      <div id="exercise-list"></div>
-      <div class="fixed-bottom">
+    <div class="sidebar">
+      <div class="card">
+        <h2 id="selected-date-title">날짜 선택</h2>
+        <div id="exercise-list"></div>
         <button id="add-exercise-btn">+ 운동 추가</button>
-        <button id="save-today-btn">기록 저장</button>
+        <button id="save-today-btn" style="margin-top:1rem;">기록 저장</button>
+      </div>
+
+      <div class="card">
+        <h2>종목별 레벨</h2>
+        <div id="level-list" class="level-list"></div>
+        <button id="auto-quadratic-btn" style="margin-top:1rem;background:#2196F3;">Quadratic 재설정 (base 200)</button>
+      </div>
+
+      <div class="card">
+        <h2>종목별 누적 그래프</h2>
+        <canvas id="perExerciseChart"></canvas>
       </div>
     </div>
-
-    <div id="chart" class="tab-content">
-      <canvas id="historyChart"></canvas>
-    </div>
-
-    <div id="settings" class="tab-content">
-      <h3>레벨업 기준 (Quadratic 자동 적용 가능)</h3>
-      <button id="auto-quadratic-btn" style="background:#2196F3;margin-bottom:1rem;">Quadratic으로 재설정 (base 200)</button>
-      <div id="level-reqs-edit"></div>
-
-      <h3 style="margin-top:2rem">보상 관리</h3>
-      <div id="rewards-edit"></div>
-      <button id="add-reward-btn" style="margin-top:1rem;">+ 보상 추가</button>
-    </div>
-
-    <div class="rewards-grid" id="rewards-grid"></div>
   </main>
-
-  <div class="level-up" id="level-up">
-    <h2>레벨업!</h2>
-    <p>축하합니다! 새로운 보상이 해금되었습니다!</p>
-  </div>
 
   <script>
     const defaultExercises = ["풀업", "푸쉬업", "앱슬라이드", "스쿼트", "카프레이즈"];
-    const defaultRewards = [
-      {level: 2, name: "휴식 데이 쿠폰", desc: "하루 쉬어도 OK!", icon: "🏖️"},
-      {level: 5, name: "좋아하는 음악 플레이리스트", desc: "운동 중 듣기", icon: "🎵"},
-      {level: 10, name: "단백질 쉐이크 한 잔", desc: "자기 보상", icon: "🥤"},
-      {level: 15, name: "새 운동화 구매 권한", desc: "동기부여!", icon: "👟"},
-      {level: 20, name: "전신 마사지 데이", desc: "회복의 날", icon: "💆"}
-    ];
 
     let data = {
       exercises: defaultExercises.map(name => ({name})),
-      history: {},
-      rewards: defaultRewards,
-      levelReqs: [] // Quadratic으로 자동 생성
+      history: {}, // "2026-01-14": {"풀업": 50, "푸쉬업": 100}
+      levelReqs: [] // Quadratic 자동 생성
     };
 
-    // Quadratic 기본값 생성 함수
     function generateQuadratic(base = 200, maxLevel = 20) {
       const reqs = [];
       for (let n = 1; n < maxLevel; n++) {
@@ -137,7 +93,6 @@
     if (localStorage.getItem("fitnessGameData")) {
       data = JSON.parse(localStorage.getItem("fitnessGameData"));
     }
-    // 첫 실행 시 Quadratic 기본 적용
     if (data.levelReqs.length === 0) {
       data.levelReqs = generateQuadratic();
       saveData();
@@ -155,48 +110,86 @@
       return total;
     }
 
-    function getLevelInfo() {
-      const total = getTotalReps();
+    function getExerciseCumulative(exName) {
+      let cum = 0;
+      for (const date in data.history) {
+        cum += data.history[date][exName] || 0;
+      }
+      return cum;
+    }
+
+    function getLevelForExercise(exName) {
+      const cum = getExerciseCumulative(exName);
+      let level = 1;
       let cumulative = 0;
-      let currentLevel = 1;
-      let nextRepsNeeded = data.levelReqs[0]?.requiredReps || 0;
       for (const req of data.levelReqs) {
-        if (cumulative + req.requiredReps > total) {
-          nextRepsNeeded = req.requiredReps - (total - cumulative);
-          break;
-        }
+        if (cumulative + req.requiredReps > cum) break;
         cumulative += req.requiredReps;
-        currentLevel = req.toLevel;
+        level = req.toLevel;
       }
-      const currentReq = data.levelReqs.find(r => r.toLevel === currentLevel + 1);
-      const percent = currentReq ? (currentReq.requiredReps - nextRepsNeeded) / currentReq.requiredReps * 100 : 100;
-      return { currentLevel, nextRepsNeeded, percent: Math.min(percent, 100) };
+      return level;
     }
 
-    function updateHeader() {
-      const prev = document.getElementById("current-level").textContent;
-      const info = getLevelInfo();
-      document.getElementById("current-level").textContent = info.currentLevel;
-      document.getElementById("progress-text").textContent = info.nextRepsNeeded > 0 ? `${info.nextRepsNeeded} reps 남음` : "최고 레벨!";
-      document.getElementById("total-reps").textContent = `총 누적: ${getTotalReps()} reps`;
+    function updateTotalInfo() {
+      document.getElementById("total-info").textContent = `총 누적: ${getTotalReps()} reps`;
+    }
 
-      const circumference = 565;
-      const offset = circumference - (info.percent / 100 * circumference);
-      document.querySelector(".progress-fill").style.strokeDashoffset = offset;
+    function updateLevelList() {
+      const list = document.getElementById("level-list");
+      list.innerHTML = "";
+      data.exercises.forEach(ex => {
+        const level = getLevelForExercise(ex.name);
+        const div = document.createElement("div");
+        div.className = "level-item";
+        div.textContent = `${ex.name}: 레벨 ${level}`;
+        list.appendChild(div);
+      });
+    }
 
-      if (info.currentLevel > prev) {
-        document.getElementById("level-up").classList.add("show");
-        setTimeout(() => document.getElementById("level-up").classList.remove("show"), 4000);
+    let calendar;
+    let selectedDate = new Date().toISOString().slice(0,10);
+
+    function initCalendar() {
+      calendar = new FullCalendar.Calendar(document.getElementById("calendar"), {
+        initialView: 'dayGridMonth',
+        headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek' },
+        dateClick: function(info) {
+          selectedDate = info.dateStr;
+          document.getElementById("selected-date-title").textContent = `${selectedDate} 기록`;
+          loadExercisesForDate(selectedDate);
+        },
+        events: getCalendarEvents(),
+        eventDidMount: function(info) {
+          info.el.title = info.event.extendedProps.tooltip;
+        }
+      });
+      calendar.render();
+    }
+
+    function getCalendarEvents() {
+      const events = [];
+      for (const date in data.history) {
+        let total = 0;
+        let details = [];
+        for (const ex in data.history[date]) {
+          const reps = data.history[date][ex];
+          total += reps;
+          details.push(`${ex}: ${reps}`);
+        }
+        if (total > 0) {
+          events.push({
+            title: `총 ${total} reps`,
+            start: date,
+            tooltip: details.join('\n'),
+            backgroundColor: '#4CAF50',
+            borderColor: '#4CAF50'
+          });
+        }
       }
-      renderRewards();
+      return events;
     }
 
-    function loadTodayRecords() {
-      const date = document.getElementById("record-date").value || new Date().toISOString().slice(0,10);
-      renderExercises(date);
-    }
-
-    function renderExercises(date) {
+    function loadExercisesForDate(date) {
       const list = document.getElementById("exercise-list");
       list.innerHTML = "";
       data.exercises.forEach((ex, i) => {
@@ -215,7 +208,8 @@
     function addExercise() {
       data.exercises.push({name: "새 운동"});
       saveData();
-      loadTodayRecords();
+      loadExercisesForDate(selectedDate);
+      updateAll();
     }
 
     function removeExercise(i) {
@@ -223,13 +217,12 @@
       data.exercises.splice(i, 1);
       for (const date in data.history) delete data.history[date][name];
       saveData();
-      loadTodayRecords();
-      updateChart();
-      updateHeader();
+      loadExercisesForDate(selectedDate);
+      updateAll();
     }
 
     function saveToday() {
-      const date = document.getElementById("record-date").value || new Date().toISOString().slice(0,10);
+      const date = selectedDate;
       if (!data.history[date]) data.history[date] = {};
       let daily = 0;
       document.querySelectorAll(".ex-reps").forEach(inp => {
@@ -244,107 +237,54 @@
         }
       });
       saveData();
-      updateChart();
-      updateHeader();
+      updateAll();
       alert(`${date} 기록 저장! (+${daily} reps)`);
     }
 
-    let chart;
-    function updateChart() {
+    let perChart;
+    function updatePerExerciseChart() {
       const dates = Object.keys(data.history).sort();
-      const datasets = data.exercises.map((ex, i) => ({
-        label: ex.name,
-        data: dates.map(d => data.history[d][ex.name] || 0),
-        backgroundColor: ["#4CAF50","#2196F3","#FF9800","#F44336","#9C27B0","#00BCD4","#FFEB3B","#795548"][i % 8] + "CC"
-      }));
+      const datasets = data.exercises.map((ex, i) => {
+        const color = ["#4CAF50","#2196F3","#FF9800","#F44336","#9C27B0","#00BCD4","#FFEB3B","#795548"][i % 8];
+        const cumData = dates.map(date => {
+          let cum = data.history[date][ex.name] || 0;
+          for (let d of dates.filter(x => x < date)) cum += data.history[d][ex.name] || 0;
+          return cum;
+        });
+        return {
+          label: `${ex.name} (레벨 ${getLevelForExercise(ex.name)})`,
+          data: cumData,
+          borderColor: color,
+          backgroundColor: color + "33",
+          tension: 0.3,
+          fill: true
+        };
+      });
 
-      if (chart) chart.destroy();
-      chart = new Chart(document.getElementById("historyChart"), {
-        type: "bar",
+      if (perChart) perChart.destroy();
+      perChart = new Chart(document.getElementById("perExerciseChart"), {
+        type: "line",
         data: { labels: dates, datasets },
-        options: {
-          plugins: { tooltip: { callbacks: { afterLabel: ctx => {
-            const date = dates[ctx.dataIndex];
-            let total = 0;
-            const details = data.exercises.map(ex => {
-              const r = data.history[date][ex.name] || 0;
-              total += r;
-              return r ? `${ex.name}: ${r}` : null;
-            }).filter(Boolean);
-            return details.length ? [`총합: ${total}`, ...details] : "";
-          }}}},
-          scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true }}
-        }
+        options: { scales: { x: { type: "time", time: { unit: "day" } } } }
       });
     }
 
-    function renderRewards() {
-      const grid = document.getElementById("rewards-grid");
-      grid.innerHTML = "";
-      const level = getLevelInfo().currentLevel;
-      data.rewards.forEach(r => {
-        const div = document.createElement("div");
-        div.className = "reward" + (level >= r.level ? " unlocked" : "");
-        div.innerHTML = `<div class="reward-icon">${r.icon}</div><h3>${r.name}</h3><p>${r.desc}<br>(레벨 ${r.level})</p>`;
-        grid.appendChild(div);
-      });
-    }
-
-    function renderLevelReqsEdit() {
-      const container = document.getElementById("level-reqs-edit");
-      container.innerHTML = "";
-      data.levelReqs.forEach((req, i) => {
-        const div = document.createElement("div");
-        div.style = "margin:1rem 0;padding:1rem;background:#2a2a2a;border-radius:8px;";
-        div.innerHTML = `레벨 ${req.toLevel} → 필요 ${req.requiredReps} reps 
-          <input type="number" value="${req.requiredReps}" data-index="${i}" class="level-req-reps" style="width:120px;margin-left:10px;">
-          <button class="danger remove-level-req" data-index="${i}" style="margin-left:10px;">삭제</button>`;
-        container.appendChild(div);
-      });
-    }
-
-    function renderRewardsEdit() {
-      const container = document.getElementById("rewards-edit");
-      container.innerHTML = "";
-      data.rewards.forEach((r, i) => {
-        const div = document.createElement("div");
-        div.style = "margin:1rem 0;padding:1rem;background:#2a2a2a;border-radius:8px;";
-        div.innerHTML = `레벨 <input type="number" value="${r.level}" data-index="${i}" class="reward-level" style="width:70px;">
-          이름 <input type="text" value="${r.name}" data-index="${i}" class="reward-name">
-          설명 <input type="text" value="${r.desc}" data-index="${i}" class="reward-desc">
-          아이콘 <input type="text" value="${r.icon}" data-index="${i}" class="reward-icon" style="width:80px;">
-          <button class="danger remove-reward" data-index="${i}">삭제</button>`;
-        container.appendChild(div);
-      });
+    function updateAll() {
+      calendar.removeAllEvents();
+      calendar.addEventSource(getCalendarEvents());
+      updateTotalInfo();
+      updateLevelList();
+      updatePerExerciseChart();
     }
 
     // Event Listeners
-    document.getElementById("record-date").value = new Date().toISOString().slice(0,10);
-    document.getElementById("record-date").addEventListener("change", loadTodayRecords);
+    document.getElementById("selected-date-title").textContent = `${selectedDate} 기록`;
     document.getElementById("add-exercise-btn").addEventListener("click", addExercise);
     document.getElementById("save-today-btn").addEventListener("click", saveToday);
     document.getElementById("auto-quadratic-btn").addEventListener("click", () => {
       data.levelReqs = generateQuadratic(200, 21);
       saveData();
-      renderLevelReqsEdit();
-      updateHeader();
-    });
-    document.getElementById("add-reward-btn").addEventListener("click", () => {
-      data.rewards.push({level: getLevelInfo().currentLevel + 1, name:"새 보상", desc:"설명", icon:"🏆"});
-      saveData();
-      renderRewardsEdit();
-    });
-
-    document.querySelectorAll(".tab").forEach(tab => {
-      tab.addEventListener("click", () => {
-        document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
-        document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
-        tab.classList.add("active");
-        document.getElementById(tab.dataset.tab).classList.add("active");
-        if (tab.dataset.tab === "today") loadTodayRecords();
-        if (tab.dataset.tab === "settings") { renderLevelReqsEdit(); renderRewardsEdit(); }
-        if (tab.dataset.tab === "chart") updateChart();
-      });
+      updateAll();
     });
 
     document.getElementById("exercise-list").addEventListener("change", e => {
@@ -359,7 +299,7 @@
           }
         }
         saveData();
-        updateChart();
+        updateAll();
       }
     });
 
@@ -367,46 +307,12 @@
       if (e.target.classList.contains("remove-ex")) removeExercise(e.target.dataset.index);
     });
 
-    document.getElementById("level-reqs-edit").addEventListener("change", e => {
-      if (e.target.classList.contains("level-req-reps")) {
-        const i = e.target.dataset.index;
-        data.levelReqs[i].requiredReps = Number(e.target.value) || 1000;
-        saveData();
-        updateHeader();
-      }
-    });
-
-    document.getElementById("level-reqs-edit").addEventListener("click", e => {
-      if (e.target.classList.contains("remove-level-req")) {
-        data.levelReqs.splice(e.target.dataset.index, 1);
-        saveData();
-        renderLevelReqsEdit();
-        updateHeader();
-      }
-    });
-
-    document.getElementById("rewards-edit").addEventListener("change", e => {
-      const i = e.target.dataset.index;
-      if (e.target.classList.contains("reward-level")) data.rewards[i].level = Number(e.target.value);
-      if (e.target.classList.contains("reward-name")) data.rewards[i].name = e.target.value;
-      if (e.target.classList.contains("reward-desc")) data.rewards[i].desc = e.target.value;
-      if (e.target.classList.contains("reward-icon")) data.rewards[i].icon = e.target.value;
-      saveData();
-    });
-
-    document.getElementById("rewards-edit").addEventListener("click", e => {
-      if (e.target.classList.contains("remove-reward")) {
-        data.rewards.splice(e.target.dataset.index, 1);
-        saveData();
-        renderRewardsEdit();
-      }
-    });
-
     // Init
-    loadTodayRecords();
-    updateHeader();
-    updateChart();
-    renderRewards();
+    document.addEventListener('DOMContentLoaded', () => {
+      initCalendar();
+      loadExercisesForDate(selectedDate);
+      updateAll();
+    });
   </script>
 </body>
 </html>
